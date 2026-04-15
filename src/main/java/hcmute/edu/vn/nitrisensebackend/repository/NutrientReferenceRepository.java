@@ -1,0 +1,16 @@
+package hcmute.edu.vn.nitrisensebackend.repository;
+
+import hcmute.edu.vn.nitrisensebackend.entity.*;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface NutrientReferenceRepository extends JpaRepository<NutrientReference, Long> {
+    // Tìm RDA phù hợp với giới tính, độ tuổi và mức độ vận động
+    Optional<NutrientReference> findByGenderAndActivityLevelAndAgeMinLessThanEqualAndAgeMaxGreaterThanEqual(
+            String gender, String activityLevel, Integer age, Integer sameAge);
+}
