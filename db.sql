@@ -685,10 +685,40 @@ DELIMITER ;
 -- ============================================
 INSERT INTO nutrient_reference (gender, activity_level, age_min, age_max, calories_kcal, protein_g, vitamin_c_mg, iron_mg, calcium_mg, water_ml) VALUES
 ('female', 'moderate', 19, 30, 2000, 46, 75, 18, 1000, 2700),
-('male', 'moderate', 19, 30, 2400, 56, 90, 8, 1000, 3000);
+('male', 'moderate', 19, 30, 2400, 56, 90, 8, 1000, 3000);\
+
+-- Thêm các món giàu PROTEIN
+INSERT INTO food_items (name, calories, protein_g, carbs_g, fat_g, fiber_g, vitamin_a_mcg, vitamin_b12_mcg, vitamin_c_mg, vitamin_d_mcg, iron_mg, calcium_mg, potassium_mg, is_deleted, source, created_by, serving_size, serving_unit)
+VALUES 
+('Ức gà luộc', 165, 31.0, 0.0, 3.6, 0.0, 0, 0.3, 0, 0, 1.0, 15.0, 255.0, 0, 'user_manual', 1, 100, 'g'),
+('Trứng gà luộc', 155, 13.0, 1.1, 11.0, 0.0, 149, 1.1, 0, 2.2, 1.2, 50.0, 126.0, 0, 'user_manual', 1, 100, 'g'),
+('Sữa chua Hy Lạp', 59, 10.0, 3.6, 0.4, 0.0, 0, 0.7, 0, 0, 0.1, 110.0, 141.0, 0, 'user_manual', 1, 100, 'g');
+
+-- Thêm các món giàu VITAMIN C
+INSERT INTO food_items (name, calories, protein_g, carbs_g, fat_g, fiber_g, vitamin_a_mcg, vitamin_b12_mcg, vitamin_c_mg, vitamin_d_mcg, iron_mg, calcium_mg, potassium_mg, is_deleted, source, created_by, serving_size, serving_unit)
+VALUES 
+('Quả Ổi', 68, 2.6, 14.3, 1.0, 5.4, 31, 0, 228.3, 0, 0.3, 18.0, 417.0, 0, 'user_manual', 1, 100, 'g'),
+('Quả Cam', 47, 0.9, 11.8, 0.1, 2.4, 11, 0, 53.2, 0, 0.1, 40.0, 181.0, 0, 'user_manual', 1, 100, 'g'),
+('Bông cải xanh (Súp lơ) luộc', 35, 2.4, 7.2, 0.4, 3.3, 31, 0, 89.2, 0, 0.7, 47.0, 316.0, 0, 'user_manual', 1, 100, 'g');
+
+-- Thêm các món giàu CANXI
+INSERT INTO food_items (name, calories, protein_g, carbs_g, fat_g, fiber_g, vitamin_a_mcg, vitamin_b12_mcg, vitamin_c_mg, vitamin_d_mcg, iron_mg, calcium_mg, potassium_mg, is_deleted, source, created_by, serving_size, serving_unit)
+VALUES 
+('Sữa tươi không đường', 42, 3.4, 4.8, 1.0, 0.0, 46, 0.4, 0, 1.0, 0.0, 120.0, 150.0, 0, 'user_manual', 1, 100, 'ml'),
+('Phô mai bò cười', 239, 11.0, 1.5, 21.0, 0.0, 200, 1.5, 0, 0, 0.5, 600.0, 100.0, 0, 'user_manual', 1, 100, 'g'),
+('Rau dền luộc', 23, 2.5, 4.0, 0.2, 2.0, 146, 0, 43.3, 0, 2.3, 215.0, 340.0, 0, 'user_manual', 1, 100, 'g');
+
+-- Thêm các món giàu SẮT
+INSERT INTO food_items (name, calories, protein_g, carbs_g, fat_g, fiber_g, vitamin_a_mcg, vitamin_b12_mcg, vitamin_c_mg, vitamin_d_mcg, iron_mg, calcium_mg, potassium_mg, is_deleted, source, created_by, serving_size, serving_unit)
+VALUES 
+('Thịt bò nạc', 250, 26.0, 0.0, 15.0, 0.0, 0, 2.6, 0, 0, 2.6, 18.0, 318.0, 0, 'user_manual', 1, 100, 'g'),
+('Gan lợn (heo)', 165, 26.0, 3.8, 4.4, 0.0, 6500, 25.3, 25.3, 0, 18.0, 9.0, 273.0, 0, 'user_manual', 1, 100, 'g');
 
 
 -- set sql_safe_updates = 1
 -- delete from food_items wher
 -- delete from food_entry_items
 select * from users;
+select * from daily_summaries;
+select * from food_entry_items;
+select * from user_goals;
