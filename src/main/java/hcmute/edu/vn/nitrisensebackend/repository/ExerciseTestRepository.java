@@ -11,4 +11,5 @@ import java.util.Optional;
 @Repository
 public interface ExerciseTestRepository extends JpaRepository<ExerciseTest, Long> {
     List<ExerciseTest> findByUserIdAndTestTypeOrderByTestDateDesc(Long userId, String testType);
+    List<ExerciseTest> findTop10ByUserIdOrderByTestDateDescTestIdDesc(Long userId);
 }
