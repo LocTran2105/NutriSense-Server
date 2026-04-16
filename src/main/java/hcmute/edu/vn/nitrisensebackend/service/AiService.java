@@ -6,16 +6,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hcmute.edu.vn.nitrisensebackend.dto.AiAnalyzeResult;
 import hcmute.edu.vn.nitrisensebackend.dto.NutrientDto;
+import hcmute.edu.vn.nitrisensebackend.dto.ReminderResponseDto;
 import hcmute.edu.vn.nitrisensebackend.entity.AiProcessingLog;
 import hcmute.edu.vn.nitrisensebackend.entity.FoodEntryItem;
 import hcmute.edu.vn.nitrisensebackend.entity.FoodItem;
-import hcmute.edu.vn.nitrisensebackend.entity.UserGoal;
 import hcmute.edu.vn.nitrisensebackend.entity.DailySummary;
 import hcmute.edu.vn.nitrisensebackend.repository.AiProcessingLogRepository;
 import hcmute.edu.vn.nitrisensebackend.repository.FoodItemRepository;
+import hcmute.edu.vn.nitrisensebackend.entity.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
@@ -25,6 +27,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class AiService {
@@ -169,78 +174,115 @@ public class AiService {
     // ==========================================================
     // 3. TẠO CÂU NHẮC NHỞ DINH DƯỠNG CUỐI NGÀY (CÓ DEEPSEEK FALLBACK)
     // ==========================================================
-    public String generateDailyReminder(Long userId, List<UserGoal> goals, List<FoodEntryItem> todayItems, DailySummary summary) {
-        final String FALLBACK_MESSAGE = "Hôm nay có vẻ chưa cân bằng lắm, mai hãy chú ý lượng Calo và nạp đủ nước nhé!";
-        try {
-            double totalVitC = 0, totalIron = 0, totalCalcium = 0;
-            for (FoodEntryItem item : todayItems) {
-                // ĐÃ FIX: Thêm .doubleValue() và đổi 0 thành 0.0
-                totalVitC += item.getVitaminCMg() != null ? item.getVitaminCMg().doubleValue() : 0.0;
-                totalIron += item.getIronMg() != null ? item.getIronMg().doubleValue() : 0.0;
-                totalCalcium += item.getCalciumMg() != null ? item.getCalciumMg().doubleValue() : 0.0;
-            }
+    // Đổi tham số thứ 2 thành UserProfile profile
+    public ReminderResponseDto generateDailyReminder(Long userId, User profile, List<FoodEntryItem> todayItems, DailySummary summary) {
+        List<FoodEntryItem> safeItems = todayItems != null ? todayItems : Collections.emptyList();
 
-            double targetCal = 2000.0, targetWater = 2000.0, targetPro = 150.0;
-            if (goals != null) {
-                for (UserGoal g : goals) {
-                    if (g.getTargetValue() == null) continue;
-                    String type = g.getGoalType().toLowerCase();
-                    if (type.contains("calorie") || type.contains("calo")) {
-                        targetCal = g.getTargetValue().doubleValue();
-                        targetPro = (targetCal * 0.30) / 4.0;
-                    } else if (type.contains("water") || type.contains("nước")) {
-                        targetWater = g.getTargetValue().doubleValue();
-                    } else if (type.contains("protein")) {
-                        targetPro = g.getTargetValue().doubleValue();
-                    }
-                }
-            }
-            double targetVitC = 90.0, targetIron = 18.0, targetCalcium = 1000.0;
-
-            double actualCal = (summary != null && summary.getTotalCalories() != null) ? summary.getTotalCalories().doubleValue() : 0.0;
-            double actualPro = (summary != null && summary.getTotalProteinG() != null) ? summary.getTotalProteinG().doubleValue() : 0.0;
-            double actualWater = (summary != null && summary.getTotalWaterMl() != null) ? summary.getTotalWaterMl().doubleValue() : 0.0;
-            List<String> warnings = new ArrayList<>();
-            if (actualCal > targetCal * 1.10) warnings.add("Dư thừa " + (int)(actualCal - targetCal) + " Calo");
-            if (actualPro < targetPro * 0.90) warnings.add("Thiếu Protein");
-            if (actualWater < targetWater * 0.90) warnings.add("Thiếu Nước");
-            if (totalVitC < targetVitC * 0.90) warnings.add("Thiếu Vitamin C");
-            if (totalIron < targetIron * 0.90) warnings.add("Thiếu Sắt");
-            if (totalCalcium < targetCalcium * 0.90) warnings.add("Thiếu Canxi");
-
-            if (warnings.isEmpty()) {
-                return "Tuyệt vời! Hôm nay bạn nạp dinh dưỡng rất chuẩn. Mai cứ giữ nhịp điệu này nhé! 🎉";
-            }
-
-            String prompt = "Người dùng hôm nay gặp vấn đề: " + String.join(", ", warnings) + ". \n" +
-                    "Nhiệm vụ: Viết đúng 1 câu duy nhất (dưới 25 chữ), cảnh báo nhẹ nhàng. Đưa ra 1 giải pháp thực tế cho ngày mai.";
-
-            try {
-                // TẦNG 1: GỌI GEMINI
-                Map<String, Object> requestBody = createSimpleRequest(prompt);
-                ResponseEntity<String> response = sendRequestToGemini(requestBody);
-                JsonNode root = mapper.readTree(response.getBody());
-                JsonNode candidates = root.path("candidates");
-                if (candidates.isArray() && !candidates.isEmpty()) {
-                    return candidates.get(0).path("content").path("parts").get(0).path("text").asText().trim();
-                }
-                throw new RuntimeException("Gemini trả về mảng rỗng");
-
-            } catch (ResourceAccessException rae) {
-                logger.warn("[Gemini] Lỗi mạng/Timeout. Chuyển DeepSeek.");
-                return executeDeepSeekFallback(prompt, FALLBACK_MESSAGE);
-            } catch (HttpStatusCodeException httpEx) {
-                if (httpEx.getStatusCode() == HttpStatus.SERVICE_UNAVAILABLE || httpEx.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
-                    logger.warn("[Gemini] Quá tải 503/429. Chuyển DeepSeek.");
-                    return executeDeepSeekFallback(prompt, FALLBACK_MESSAGE);
-                }
-                logger.error("[Gemini] Lỗi HTTP: {}", httpEx.getResponseBodyAsString());
-                return FALLBACK_MESSAGE;
-            }
-        } catch (Exception e) {
-            logger.error("[Hệ thống] Lỗi Logic: {}", e.getMessage(), e);
-            return FALLBACK_MESSAGE;
+        double totalVitC = 0, totalIron = 0, totalCalcium = 0;
+        for (FoodEntryItem item : safeItems) {
+            totalVitC += item.getVitaminCMg() != null ? item.getVitaminCMg().doubleValue() : 0.0;
+            totalIron += item.getIronMg() != null ? item.getIronMg().doubleValue() : 0.0;
+            totalCalcium += item.getCalciumMg() != null ? item.getCalciumMg().doubleValue() : 0.0;
         }
+
+        // ==========================================
+        // ĐÂY LÀ ĐOẠN CẦN SỬA: LẤY MỤC TIÊU TỪ PROFILE
+        // ==========================================
+        double targetCal = 2000.0, targetWater = 2000.0, targetPro = 150.0;
+
+        if (profile != null) {
+            if (profile.getDailyCalorieGoal() != null) {
+                targetCal = profile.getDailyCalorieGoal().doubleValue();
+                targetPro = (targetCal * 0.30) / 4.0; // Mặc định protein chiếm 30% tổng Calo
+            }
+            if (profile.getWaterGoalMl() != null) {
+                targetWater = profile.getWaterGoalMl().doubleValue();
+            }
+        }
+        // ==========================================
+
+        double targetVitC = 90.0, targetIron = 18.0, targetCalcium = 1000.0;
+
+        double actualCal = (summary != null && summary.getTotalCalories() != null) ? summary.getTotalCalories().doubleValue() : 0.0;
+        double actualPro = (summary != null && summary.getTotalProteinG() != null) ? summary.getTotalProteinG().doubleValue() : 0.0;
+        double actualWater = (summary != null && summary.getTotalWaterMl() != null) ? summary.getTotalWaterMl().doubleValue() : 0.0;
+
+        // ... (Phần bên dưới List<String> deficitLines = new ArrayList<>(); giữ nguyên không đổi)
+        List<String> deficitLines = new ArrayList<>();
+        List<String> foodTips = new ArrayList<>();
+
+        // Vẫn dùng Pageable(0,2) để mỗi chất chỉ gợi ý tối đa 2 món, tránh việc 1 chất in ra 10 món
+        Pageable topTwo = PageRequest.of(0, 2);
+
+        if (actualCal < targetCal) {
+            deficitLines.add("Thiếu " + fmt(targetCal - actualCal) + " kcal");
+        }
+
+        if (actualPro < targetPro) {
+            deficitLines.add("Thiếu " + fmt(targetPro - actualPro) + "g Protein");
+            List<String> foodNames = foodItemRepository.findTopProteinFoods(topTwo)
+                    .stream().map(FoodItem::getName).collect(Collectors.toList());
+            if (!foodNames.isEmpty()) foodTips.add("Protein: " + String.join(" hoặc ", foodNames));
+        }
+
+        if (actualWater < targetWater) {
+            deficitLines.add("Thiếu " + fmt(targetWater - actualWater) + "ml Nước");
+            foodTips.add("Nước: Nhớ uống đủ nước nhé!");
+        }
+
+        if (totalVitC < targetVitC) {
+            deficitLines.add("Thiếu " + fmt(targetVitC - totalVitC) + "mg Vitamin C");
+            List<String> foodNames = foodItemRepository.findTopVitaminCFoods(topTwo)
+                    .stream().map(FoodItem::getName).collect(Collectors.toList());
+            if (!foodNames.isEmpty()) foodTips.add("Vitamin C: " + String.join(" hoặc ", foodNames));
+        }
+
+        if (totalIron < targetIron) {
+            deficitLines.add("Thiếu " + fmt(targetIron - totalIron) + "mg Sắt");
+            List<String> foodNames = foodItemRepository.findTopIronFoods(topTwo)
+                    .stream().map(FoodItem::getName).collect(Collectors.toList());
+            if (!foodNames.isEmpty()) foodTips.add("Sắt: " + String.join(" hoặc ", foodNames));
+        }
+
+        if (totalCalcium < targetCalcium) {
+            deficitLines.add("Thiếu " + fmt(targetCalcium - totalCalcium) + "mg Canxi");
+            List<String> foodNames = foodItemRepository.findTopCalciumFoods(topTwo)
+                    .stream().map(FoodItem::getName).collect(Collectors.toList());
+            if (!foodNames.isEmpty()) foodTips.add("Canxi: " + String.join(" hoặc ", foodNames));
+        }
+
+        if (deficitLines.isEmpty()) {
+            String okMsg = "Tuyệt vời! Hôm nay bạn đã đạt mục tiêu dinh dưỡng, cứ giữ nhịp này nhé.";
+            return new ReminderResponseDto(okMsg, okMsg);
+        }
+
+        String notificationText = buildShortReminder(deficitLines);
+        String detailText = buildFullReminder(deficitLines, foodTips);
+
+        return new ReminderResponseDto(notificationText, detailText);
+    }
+
+    private String buildShortReminder(List<String> deficitLines) {
+        // Hiện TẤT CẢ các chất thiếu, ngăn cách bằng dấu chấm phẩy
+        return "Bạn đang thiếu: " + String.join("; ", deficitLines) + ".";
+    }
+
+    private String buildFullReminder(List<String> deficitLines, List<String> foodTips) {
+        String summary = String.join(", ", deficitLines);
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("Bạn đang ").append(summary).append(".\n");
+
+        // Hiện TẤT CẢ gợi ý món ăn
+        if (!foodTips.isEmpty()) {
+            sb.append("\n💡 Gợi ý để bù chất:\n- ");
+            sb.append(String.join("\n- ", foodTips));
+        }
+        return sb.toString();
+    }
+
+    private String fmt(double value) {
+        return BigDecimal.valueOf(value).setScale(1, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
     }
 
     private String executeDeepSeekFallback(String prompt, String fallbackMessage) {
