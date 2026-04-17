@@ -5,18 +5,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import hcmute.edu.vn.nitrisensebackend.dto.ChatMessageResponseDTO;
 import hcmute.edu.vn.nitrisensebackend.entity.ChatMessage;
 import hcmute.edu.vn.nitrisensebackend.entity.DailySummary;
-import hcmute.edu.vn.nitrisensebackend.entity.User; // Entity bảng users
+import hcmute.edu.vn.nitrisensebackend.entity.ExerciseTest;
+import hcmute.edu.vn.nitrisensebackend.entity.FoodEntryItem;
+import hcmute.edu.vn.nitrisensebackend.entity.User;
 import hcmute.edu.vn.nitrisensebackend.enums.ChatMessageType;
 import hcmute.edu.vn.nitrisensebackend.enums.ChatSender;
 import hcmute.edu.vn.nitrisensebackend.repository.ChatMessageRepository;
-import hcmute.edu.vn.nitrisensebackend.repository.UserRepository; // Repo bảng users
+import hcmute.edu.vn.nitrisensebackend.repository.ExerciseTestRepository;
+import hcmute.edu.vn.nitrisensebackend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,18 +34,32 @@ public class ChatService {
     private final GeminiService geminiService;
     private final DailySummaryService dailySummaryService;
     private final ObjectMapper mapper;
-    private final UserRepository userRepository; // THÊM REPO NÀY
+    private final UserRepository userRepository;
+    private final RestTemplate restTemplate;
+    private final MealService mealService;
+
+    // THÊM REPOSITORY THỂ LỰC
+    private final ExerciseTestRepository exerciseTestRepository;
+
+    @Value("${deepseek.api.key}")
+    private String deepseekApiKey;
 
     public ChatService(ChatMessageRepository chatRepository,
                        GeminiService geminiService,
                        DailySummaryService dailySummaryService,
                        ObjectMapper mapper,
-                       UserRepository userRepository) {
+                       UserRepository userRepository,
+                       RestTemplate restTemplate,
+                       MealService mealService,
+                       ExerciseTestRepository exerciseTestRepository) { // Tiêm vào Constructor
         this.chatRepository = chatRepository;
         this.geminiService = geminiService;
         this.dailySummaryService = dailySummaryService;
         this.mapper = mapper;
         this.userRepository = userRepository;
+        this.restTemplate = restTemplate;
+        this.mealService = mealService;
+        this.exerciseTestRepository = exerciseTestRepository;
     }
 
     @Transactional(readOnly = true)
@@ -59,38 +81,45 @@ public class ChatService {
     @Transactional
     public ChatMessageResponseDTO processUserMessage(Long userId, String userText) {
 
-        // --------------------------------------------------------------------
-        // BƯỚC 1: BUILD RAG CONTEXT (LÀM TRƯỚC KHI LƯU DB ĐỂ TRÁNH LẶP TIN NHẮN)
-        // --------------------------------------------------------------------
+        // 1. BUILD RAG CONTEXT
         StringBuilder contextBuilder = new StringBuilder("Ngữ cảnh hiện tại của User:\n");
+        User user = userRepository.findById(userId).orElse(null);
 
-        // 1.1 Lấy User Profile (Check null cẩn thận)
-        try {
-            User user = userRepository.findById(userId).orElse(null);
-            if (user != null) {
-                if (user.getWeightKg() != null && user.getHeightCm() != null) {
-                    contextBuilder.append(String.format("- Chỉ số cơ thể: Cân nặng %.1f kg, Chiều cao %.1f cm.\n",
-                            user.getWeightKg(), user.getHeightCm()));
-                }
-                if (user.getDailyCalorieGoal() != null && user.getWaterGoalMl() != null) {
-                    contextBuilder.append(String.format("- Mục tiêu mỗi ngày: %d kcal, %d ml nước.\n",
-                            user.getDailyCalorieGoal(), user.getWaterGoalMl()));
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("[ChatService] Lỗi lấy User Info: " + e.getMessage());
+        // BƠM THÔNG TIN CƠ BẢN
+        if (user != null && user.getWeightKg() != null && user.getHeightCm() != null) {
+            contextBuilder.append(String.format("- Chỉ số cơ thể: Cân nặng %.1f kg, Chiều cao %.1f cm.\n",
+                    user.getWeightKg(), user.getHeightCm()));
         }
 
-        // 1.2 Lấy Dinh dưỡng hôm nay
-        try {
-            DailySummary summary = dailySummaryService.getSummaryByDate(userId, LocalDate.now());
-            if (summary != null) {
-                contextBuilder.append(String.format("- Dinh dưỡng hôm nay đã nạp: Calo: %d, Pro: %s, Carbs: %s, Fat: %s, Nước: %d ml\n",
-                        summary.getTotalCalories(), summary.getTotalProteinG(), summary.getTotalCarbsG(), summary.getTotalFatG(), summary.getTotalWaterMl()));
-            }
-        } catch (Exception ignored) {}
+        // BƠM THÔNG TIN THIẾU HỤT
+        String deficitContext = buildDailyNutrientDeficitContext(userId, user);
+        contextBuilder.append(deficitContext);
 
-        // 1.3 Lấy Lịch sử Chat gần đây (Lúc này CHƯA có tin nhắn hiện tại)
+        // ========================================================
+        // BƠM THÔNG TIN THỂ LỰC (MỚI THÊM)
+        // ========================================================
+        try {
+            List<ExerciseTest> recentTests = exerciseTestRepository.findTop10ByUserIdOrderByTestDateDescTestIdDesc(userId);
+            if (recentTests != null && !recentTests.isEmpty()) {
+                contextBuilder.append("- Đánh giá thể lực gần đây của user:\n");
+                for (ExerciseTest test : recentTests) {
+                    String testName = test.getTestType();
+                    // Việt hóa tên bài tập giống như ở Frontend
+                    if ("pushups".equals(testName)) testName = "Hít đất";
+                    else if ("plank_seconds".equals(testName)) testName = "Plank";
+                    else if ("situps".equals(testName)) testName = "Gập bụng";
+                    else if ("running_1km".equals(testName)) testName = "Chạy 1km";
+
+                    String notes = test.getNotes() != null ? test.getNotes() : "Chưa có đánh giá";
+                    contextBuilder.append(String.format("  + Ngày %s: %s đạt %s %s (Đánh giá: %s)\n",
+                            test.getTestDate(), testName, test.getValue(), test.getUnit(), notes));
+                }
+            }
+        } catch (Exception ignored) {
+            System.err.println("[ChatService] Lỗi lấy dữ liệu thể lực: " + ignored.getMessage());
+        }
+
+        // BƠM LỊCH SỬ CHAT
         try {
             List<ChatMessage> recentChats = chatRepository.findTop5ByUserIdOrderByCreatedAtDesc(userId);
             Collections.reverse(recentChats);
@@ -100,9 +129,7 @@ public class ChatService {
             }
         } catch (Exception ignored) {}
 
-        // --------------------------------------------------------------------
-        // BƯỚC 2: BÂY GIỜ MỚI LƯU TIN NHẮN USER XUỐNG DB
-        // --------------------------------------------------------------------
+        // 2. LƯU TIN NHẮN USER XUỐNG DB
         ChatMessage userMsg = new ChatMessage();
         userMsg.setUserId(userId);
         userMsg.setSender(ChatSender.USER);
@@ -111,39 +138,63 @@ public class ChatService {
         userMsg.setIsRead(true);
         chatRepository.save(userMsg);
 
-        // --------------------------------------------------------------------
-        // BƯỚC 3: PROMPT ENGINEERING NÂNG CẤP (Chống bịa chuyện - Hallucination)
-        // --------------------------------------------------------------------
+        // 3. PROMPT ENGINEERING
         String systemPrompt = contextBuilder.toString() + "\n\n" +
-                "Bạn là trợ lý dinh dưỡng NitriSense.\n" +
-                "BẮT BUỘC:\n" +
-                "- Sử dụng số liệu trong 'Ngữ cảnh hiện tại' để tính toán và tư vấn.\n" +
-                "- TUYỆT ĐỐI KHÔNG nói 'không có quyền truy cập'. Nếu dữ liệu bị thiếu, hãy giải thích từ tốn là bạn chưa có thông tin đó và hướng dẫn người dùng cập nhật, KHÔNG được tự bịa số liệu.\n" +
-                "- Phân loại message_type: 'WARNING' (thiếu/dư chất/nước nghiêm trọng), 'ACHIEVEMENT' (đạt mục tiêu), 'CHAT' (bình thường).\n" +
-                "Lưu ý: Trả lời ngắn gọn, thân thiện. Nếu có cảnh báo số liệu quan trọng, đưa nó vào trường context_data ở dạng JSON.";
+                "Bạn là trợ lý dinh dưỡng và sức khỏe NitriSense.\n" +
+                "QUY TẮC:\n" +
+                "- Dựa vào phần '- THIẾU HỤT HÔM NAY (ĐÃ TÍNH SẴN)' để trả lời chính xác người dùng còn thiếu bao nhiêu chất.\n" +
+                "- Dựa vào phần đánh giá thể lực để tư vấn thêm về chế độ ăn hoặc tập luyện nếu cần.\n" +
+                "- KHÔNG TỰ TÍNH TOÁN LẠI các số liệu thiếu hụt đã cung cấp.\n" +
+                "- Trả lời ngắn gọn, thân thiện, mang tính động viên.\n" +
+                "BẮT BUỘC TRẢ VỀ ĐỊNH DẠNG JSON. KHÔNG KÈM MARKDOWN HAY TEXT THỪA.\n" +
+                "Các giá trị hợp lệ cho message_type là: CHAT, WARNING, ACHIEVEMENT.\n" +
+                "Mẫu JSON chuẩn:\n" +
+                "{\n" +
+                "  \"response_text\": \"Câu trả lời của bạn\",\n" +
+                "  \"message_type\": \"CHAT\",\n" +
+                "  \"context_data\": {}\n" +
+                "}";
 
-        // --------------------------------------------------------------------
-        // BƯỚC 4: GỌI GEMINI & LƯU PHẢN HỒI
-        // --------------------------------------------------------------------
+        // 4. GỌI AI VÀ XỬ LÝ FALLBACK
         ChatMessage aiMsg = new ChatMessage();
         aiMsg.setUserId(userId);
         aiMsg.setSender(ChatSender.AI);
         aiMsg.setIsRead(false);
 
+        String aiJson = null;
         try {
-            String aiJson = geminiService.generateChatResponse(systemPrompt, userText);
-            JsonNode root = mapper.readTree(aiJson);
-
-            aiMsg.setMessageText(root.path("response_text").asText());
-            aiMsg.setMessageType(safeParseEnum(root.path("message_type").asText()));
-
-            // Xử lý contextData (Giữ nguyên cấu trúc JsonNode)
-            if (root.has("context_data") && !root.get("context_data").isNull() && !root.get("context_data").isEmpty()) {
-                aiMsg.setContextData(root.get("context_data"));
-            }
-
+            aiJson = geminiService.generateChatResponse(systemPrompt, userText);
         } catch (Exception e) {
-            System.err.println("[ChatService] Lỗi gọi AI hoặc Parse JSON: " + e.getMessage());
+            System.err.println("[ChatService] Gemini lỗi/quá tải. Chuyển sang DeepSeek...");
+            try {
+                aiJson = callDeepSeekFallback(systemPrompt, userText);
+            } catch (Exception deepSeekEx) {
+                System.err.println("[ChatService] DeepSeek cũng lỗi: " + deepSeekEx.getMessage());
+            }
+        }
+
+        if (aiJson != null) {
+            try {
+                String cleanJson = aiJson.trim();
+                if (cleanJson.startsWith("```json")) cleanJson = cleanJson.substring(7);
+                else if (cleanJson.startsWith("```")) cleanJson = cleanJson.substring(3);
+                if (cleanJson.endsWith("```")) cleanJson = cleanJson.substring(0, cleanJson.length() - 3);
+                cleanJson = cleanJson.trim();
+
+                JsonNode root = mapper.readTree(cleanJson);
+
+                aiMsg.setMessageText(root.path("response_text").asText());
+                aiMsg.setMessageType(safeParseEnum(root.path("message_type").asText("CHAT")));
+
+                if (root.has("context_data") && !root.get("context_data").isNull() && !root.get("context_data").isEmpty()) {
+                    aiMsg.setContextData(root.get("context_data"));
+                }
+            } catch (Exception parseEx) {
+                System.err.println("[ChatService] Lỗi Parse JSON: " + parseEx.getMessage());
+                aiMsg.setMessageText(aiJson);
+                aiMsg.setMessageType(ChatMessageType.CHAT);
+            }
+        } else {
             aiMsg.setMessageType(ChatMessageType.WARNING);
             aiMsg.setMessageText("Hệ thống AI đang bận hoặc quá tải. Vui lòng thử lại sau ít phút nhé!");
         }
@@ -151,7 +202,119 @@ public class ChatService {
         return convertToDTO(chatRepository.save(aiMsg));
     }
 
-    // HÀM AN TOÀN CHỐNG CRASH KHI PARSE ENUM
+    // ========================================================
+    // HÀM BACKEND TỰ TÍNH TOÁN THIẾU HỤT
+    // ========================================================
+    private String buildDailyNutrientDeficitContext(Long userId, User user) {
+        StringBuilder sb = new StringBuilder();
+
+        double targetCal = 2000.0, targetWater = 2000.0, targetPro = 150.0;
+        if (user != null) {
+            if (user.getDailyCalorieGoal() != null) {
+                targetCal = user.getDailyCalorieGoal().doubleValue();
+                targetPro = (targetCal * 0.30) / 4.0; // 30% Calo từ Protein
+            }
+            if (user.getWaterGoalMl() != null) {
+                targetWater = user.getWaterGoalMl().doubleValue();
+            }
+        }
+        double targetVitC = 90.0, targetIron = 18.0, targetCalcium = 1000.0;
+
+        double actualCal = 0, actualPro = 0, actualWater = 0;
+        double actualVitC = 0, actualIron = 0, actualCalcium = 0;
+
+        try {
+            DailySummary summary = dailySummaryService.getSummaryByDate(userId, LocalDate.now());
+            if (summary != null) {
+                actualCal = summary.getTotalCalories() != null ? summary.getTotalCalories().doubleValue() : 0;
+                actualPro = summary.getTotalProteinG() != null ? summary.getTotalProteinG().doubleValue() : 0;
+                actualWater = summary.getTotalWaterMl() != null ? summary.getTotalWaterMl().doubleValue() : 0;
+            }
+
+            List<FoodEntryItem> todayItems = mealService.getMealItemsForWholeDay(userId, LocalDate.now());
+            if (todayItems != null) {
+                for (FoodEntryItem item : todayItems) {
+                    actualVitC += item.getVitaminCMg() != null ? item.getVitaminCMg().doubleValue() : 0.0;
+                    actualIron += item.getIronMg() != null ? item.getIronMg().doubleValue() : 0.0;
+                    actualCalcium += item.getCalciumMg() != null ? item.getCalciumMg().doubleValue() : 0.0;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ChatService] Lỗi tính tổng dinh dưỡng: " + e.getMessage());
+        }
+
+        double missingCal = Math.max(0, targetCal - actualCal);
+        double missingPro = Math.max(0, targetPro - actualPro);
+        double missingWater = Math.max(0, targetWater - actualWater);
+        double missingVitC = Math.max(0, targetVitC - actualVitC);
+        double missingIron = Math.max(0, targetIron - actualIron);
+        double missingCalcium = Math.max(0, targetCalcium - actualCalcium);
+
+        sb.append("- THIẾU HỤT HÔM NAY (ĐÃ TÍNH SẴN):\n");
+        if (missingCal == 0 && missingPro == 0 && missingWater == 0 && missingVitC == 0 && missingIron == 0 && missingCalcium == 0) {
+            sb.append("  + Tuyệt vời! Hôm nay người dùng đã đạt đủ 100% mục tiêu dinh dưỡng.\n");
+        } else {
+            if (missingCal > 0) sb.append(String.format("  + Calo còn thiếu: %s kcal\n", fmt(missingCal)));
+            if (missingPro > 0) sb.append(String.format("  + Protein còn thiếu: %s g\n", fmt(missingPro)));
+            if (missingWater > 0) sb.append(String.format("  + Nước còn thiếu: %s ml\n", fmt(missingWater)));
+            if (missingVitC > 0) sb.append(String.format("  + Vitamin C còn thiếu: %s mg\n", fmt(missingVitC)));
+            if (missingIron > 0) sb.append(String.format("  + Sắt còn thiếu: %s mg\n", fmt(missingIron)));
+            if (missingCalcium > 0) sb.append(String.format("  + Canxi còn thiếu: %s mg\n", fmt(missingCalcium)));
+        }
+
+        return sb.toString();
+    }
+
+    private String fmt(double value) {
+        return BigDecimal.valueOf(value).setScale(1, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+    }
+
+    // ========================================================
+    // HÀM GỌI DEEPSEEK THAY THẾ GEMINI
+    // ========================================================
+    private String callDeepSeekFallback(String systemPrompt, String userText) throws Exception {
+        String url = "https://api.deepseek.com/chat/completions";
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", "deepseek-chat");
+
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt));
+        messages.add(Map.of("role", "user", "content", userText));
+        requestBody.put("messages", messages);
+
+        requestBody.put("response_format", Map.of("type", "json_object"));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(deepseekApiKey);
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+        if (response.getBody() == null || response.getBody().trim().isEmpty()) {
+            throw new RuntimeException("DeepSeek trả về HTTP body rỗng");
+        }
+
+        JsonNode root = mapper.readTree(response.getBody());
+        JsonNode choices = root.path("choices");
+
+        if (!choices.isArray() || choices.isEmpty()) {
+            throw new RuntimeException("DeepSeek trả về JSON không hợp lệ (thiếu 'choices')");
+        }
+
+        JsonNode messageNode = choices.get(0).path("message");
+        if (messageNode.isMissingNode() || messageNode.path("content").isNull()) {
+            throw new RuntimeException("DeepSeek trả về nội dung tin nhắn rỗng");
+        }
+
+        String content = messageNode.path("content").asText().trim();
+        if (content.isEmpty()) {
+            throw new RuntimeException("DeepSeek sinh ra chuỗi content rỗng");
+        }
+
+        return content;
+    }
+
     private ChatMessageType safeParseEnum(String value) {
         if (value == null || value.trim().isEmpty()) {
             return ChatMessageType.CHAT;
@@ -159,22 +322,17 @@ public class ChatService {
         try {
             return ChatMessageType.valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            System.err.println("[ChatService] Cảnh báo: AI trả về MessageType lạ: " + value);
-            return ChatMessageType.CHAT; // Rơi về mặc định nếu Gemini trả bậy
+            return ChatMessageType.CHAT;
         }
     }
 
-    // CHUYỂN ENTITY SANG DTO (BẢO TOÀN JSON NODE)
     private ChatMessageResponseDTO convertToDTO(ChatMessage msg) {
         ChatMessageResponseDTO dto = new ChatMessageResponseDTO();
         dto.setId(msg.getMessageId());
         dto.setSender(msg.getSender().name());
         dto.setMessageType(msg.getMessageType().name());
         dto.setText(msg.getMessageText());
-
-        // Truyền thẳng JsonNode, Jackson sẽ tự lo việc hiển thị JSON đẹp ra Client
         dto.setContextData(msg.getContextData());
-
         dto.setIsRead(msg.getIsRead());
         dto.setReadAt(msg.getReadAt());
         dto.setCreatedAt(msg.getCreatedAt());

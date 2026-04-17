@@ -3,8 +3,10 @@ package hcmute.edu.vn.nitrisensebackend.controller;
 import hcmute.edu.vn.nitrisensebackend.dto.DashboardDTO;
 import hcmute.edu.vn.nitrisensebackend.entity.DailySummary;
 import hcmute.edu.vn.nitrisensebackend.entity.FoodEntryItem;
+import hcmute.edu.vn.nitrisensebackend.entity.User;
 import hcmute.edu.vn.nitrisensebackend.repository.DailySummaryRepository;
 import hcmute.edu.vn.nitrisensebackend.repository.FoodEntryItemRepository;
+import hcmute.edu.vn.nitrisensebackend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +27,10 @@ public class ReportController {
     private DailySummaryRepository dailySummaryRepository;
 
     @Autowired
-    private FoodEntryItemRepository foodEntryItemRepository; // Thêm repository mới
+    private FoodEntryItemRepository foodEntryItemRepository;
+
+    @Autowired
+    private UserRepository userRepository; // Thêm repo này để lấy Profile
 
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardDTO> getDashboardReport(
@@ -33,7 +38,7 @@ public class ReportController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-        // 1. TÍNH CALO VÀ MACRO TỪ SUMMARY (1 Cú Query)
+        // 1. TÍNH CALO VÀ MACRO TỪ SUMMARY
         List<DailySummary> summaries = dailySummaryRepository.findByUserIdAndSummaryDateBetweenOrderBySummaryDateAsc(userId, startDate, endDate);
         Map<LocalDate, DailySummary> map = summaries.stream()
                 .collect(Collectors.toMap(DailySummary::getSummaryDate, s -> s));
@@ -64,7 +69,7 @@ public class ReportController {
             current = current.plusDays(1);
         }
 
-        // 2. TÍNH VI CHẤT TỪ FOOD ENTRY ITEMS (Chống N+1 Query)
+        // 2. TÍNH VI CHẤT TỪ FOOD ENTRY ITEMS
         List<FoodEntryItem> allItems = foodEntryItemRepository.findAllItemsByUserIdAndDateRange(userId, startDate, endDate);
         double totalFiber = 0.0, totalVitC = 0.0, totalIron = 0.0, totalCalcium = 0.0;
 
@@ -75,20 +80,57 @@ public class ReportController {
             totalCalcium += item.getCalciumMg() != null ? item.getCalciumMg().doubleValue() : 0.0;
         }
 
-        // 3. TÍNH TRUNG BÌNH VÀ TRẢ VỀ
         long totalDays = ChronoUnit.DAYS.between(startDate, endDate) + 1; // Luôn chia cho 7
 
+        // 3. LẤY MỤC TIÊU CỦA USER VÀ NHÂN LÊN THEO SỐ NGÀY
+        User user = userRepository.findById(userId).orElse(null);
+        int dailyTargetCal = (user != null && user.getDailyCalorieGoal() != null) ? user.getDailyCalorieGoal() : 2000;
+        int dailyTargetWater = (user != null && user.getWaterGoalMl() != null) ? user.getWaterGoalMl() : 2000;
+
+        double dailyTargetPro = (dailyTargetCal * 0.3) / 4.0;
+        double dailyTargetCarb = (dailyTargetCal * 0.4) / 4.0;
+        double dailyTargetFat = (dailyTargetCal * 0.3) / 9.0;
+
         DashboardDTO dto = new DashboardDTO();
+
+        // --- Dữ liệu trung bình (Giữ lại để tương thích ngược) ---
         dto.setAvgCalories((int) (totalCal / totalDays));
         dto.setAvgWaterLiters((totalWater / (double) totalDays) / 1000.0);
         dto.setAvgProtein(totalPro / totalDays);
         dto.setAvgCarbs(totalCarb / totalDays);
         dto.setAvgFat(totalFat / totalDays);
-
         dto.setAvgFiber(totalFiber / totalDays);
         dto.setAvgVitaminC(totalVitC / totalDays);
         dto.setAvgIron(totalIron / totalDays);
         dto.setAvgCalcium(totalCalcium / totalDays);
+
+        // --- GÁN DỮ LIỆU TỔNG VÀ MỤC TIÊU 7 NGÀY ---
+        dto.setTotalCalories(totalCal);
+        dto.setTargetCalories((int)(dailyTargetCal * totalDays));
+
+        dto.setTotalWaterLiters(totalWater / 1000.0);
+        dto.setTargetWaterLiters((dailyTargetWater * totalDays) / 1000.0);
+
+        dto.setTotalProtein(totalPro);
+        dto.setTargetProtein(dailyTargetPro * totalDays);
+
+        dto.setTotalCarbs(totalCarb);
+        dto.setTargetCarbs(dailyTargetCarb * totalDays);
+
+        dto.setTotalFat(totalFat);
+        dto.setTargetFat(dailyTargetFat * totalDays);
+
+        dto.setTotalFiber(totalFiber);
+        dto.setTargetFiber(28.0 * totalDays); // Ngưỡng mặc định 28g xơ/ngày
+
+        dto.setTotalVitaminC(totalVitC);
+        dto.setTargetVitaminC(90.0 * totalDays); // 90mg/ngày
+
+        dto.setTotalIron(totalIron);
+        dto.setTargetIron(18.0 * totalDays); // 18mg/ngày
+
+        dto.setTotalCalcium(totalCalcium);
+        dto.setTargetCalcium(1000.0 * totalDays); // 1000mg/ngày
 
         dto.setChartData(chartData);
 
