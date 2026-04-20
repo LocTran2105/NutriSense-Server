@@ -83,81 +83,88 @@ public class MealService {
     }
 
     // 2. LƯU HÀNG LOẠT MÓN TỪ ẢNH (BẬT TRANSACTION BẢO VỆ)
-    @Transactional(rollbackOn = Exception.class)
-    public void saveMealFromAi(Long userId, String mealType, LocalDate date, List<NutrientDto> confirmedItems, String imageUrls) {
+        @Transactional(rollbackOn = Exception.class)
+        public void saveMealFromAi(Long userId, String mealType, LocalDate date, List<NutrientDto> confirmedItems, String imageUrls) {
 
-        FoodEntry currentEntry = foodEntryRepository.findByUserIdAndEntryDateAndMealTypeAndIsDeletedFalse(userId, date, mealType)
-                .orElseGet(() -> {
-                    FoodEntry newEntry = new FoodEntry();
-                    newEntry.setUserId(userId);
-                    newEntry.setEntryDate(date);
-                    newEntry.setMealType(mealType);
-                    newEntry.setCreatedBy(userId);
+            FoodEntry currentEntry = foodEntryRepository.findByUserIdAndEntryDateAndMealTypeAndIsDeletedFalse(userId, date, mealType)
+                    .orElseGet(() -> {
+                        FoodEntry newEntry = new FoodEntry();
+                        newEntry.setUserId(userId);
+                        newEntry.setEntryDate(date);
+                        newEntry.setMealType(mealType);
+                        newEntry.setCreatedBy(userId);
 
-                    newEntry.setDeleted(false); // THÊM DÒNG NÀY
+                        newEntry.setDeleted(false); // THÊM DÒNG NÀY
 
-                    return foodEntryRepository.save(newEntry);
-                });
+                        return foodEntryRepository.save(newEntry);
+                    });
 
-        List<FoodEntryItem> itemsToSave = new ArrayList<>();
+            List<FoodEntryItem> itemsToSave = new ArrayList<>();
 
-        for (NutrientDto dto : confirmedItems) {
-            FoodItem foodItem = new FoodItem();
-            foodItem.setName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
-            foodItem.setServingSize(dto.getServingSize() != null ? dto.getServingSize() : BigDecimal.ONE);
-            foodItem.setServingUnit(dto.getServingUnit() != null ? dto.getServingUnit() : "phần");
+            for (NutrientDto dto : confirmedItems) {
+                FoodItem foodItem = new FoodItem();
+                foodItem.setName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
+                foodItem.setServingSize(dto.getServingSize() != null ? dto.getServingSize() : BigDecimal.ONE);
+                foodItem.setServingUnit(dto.getServingUnit() != null ? dto.getServingUnit() : "phần");
 
-            foodItem.setCalories(safe(dto.getCalories()));
-            foodItem.setProteinG(safe(dto.getProteinG()));
-            foodItem.setCarbsG(safe(dto.getCarbsG()));
-            foodItem.setFatG(safe(dto.getFatG()));
-            foodItem.setFiberG(safe(dto.getFiberG()));
-            foodItem.setVitaminAMcg(safe(dto.getVitaminAMcg()));
-            foodItem.setVitaminB12Mcg(safe(dto.getVitaminB12Mcg()));
-            foodItem.setVitaminCMg(safe(dto.getVitaminCMg()));
-            foodItem.setVitaminDMcg(safe(dto.getVitaminDMcg()));
-            foodItem.setIronMg(safe(dto.getIronMg()));
-            foodItem.setCalciumMg(safe(dto.getCalciumMg()));
-            foodItem.setPotassiumMg(safe(dto.getPotassiumMg()));
+                foodItem.setCalories(safe(dto.getCalories()));
+                foodItem.setProteinG(safe(dto.getProteinG()));
+                foodItem.setCarbsG(safe(dto.getCarbsG()));
+                foodItem.setFatG(safe(dto.getFatG()));
+                foodItem.setFiberG(safe(dto.getFiberG()));
+                foodItem.setVitaminAMcg(safe(dto.getVitaminAMcg()));
+                foodItem.setVitaminB12Mcg(safe(dto.getVitaminB12Mcg()));
+                foodItem.setVitaminCMg(safe(dto.getVitaminCMg()));
+                foodItem.setVitaminDMcg(safe(dto.getVitaminDMcg()));
+                foodItem.setIronMg(safe(dto.getIronMg()));
+                foodItem.setCalciumMg(safe(dto.getCalciumMg()));
+                foodItem.setPotassiumMg(safe(dto.getPotassiumMg()));
 
-            foodItem.setSource("gemini_ai");
-            foodItem.setCreatedBy(userId);
+                foodItem.setSource("gemini_ai");
+                foodItem.setCreatedBy(userId);
 
-            foodItem.setDeleted(false); // THÊM DÒNG NÀY
+                foodItem.setDeleted(false); // THÊM DÒNG NÀY
 
-            foodItem = foodItemRepository.save(foodItem);
+                foodItem = foodItemRepository.save(foodItem);
 
-            FoodEntryItem entryItem = new FoodEntryItem();
-            entryItem.setEntryId(currentEntry.getEntryId());
-            entryItem.setFoodId(foodItem.getFoodId());
-            entryItem.setServingQty(BigDecimal.ONE);
+                FoodEntryItem entryItem = new FoodEntryItem();
+                entryItem.setEntryId(currentEntry.getEntryId());
+                entryItem.setFoodId(foodItem.getFoodId());
+                entryItem.setServingQty(BigDecimal.ONE);
+                if (dto.getRawInput() != null && !dto.getRawInput().trim().isEmpty()) {
+                    entryItem.setRawInput(dto.getRawInput());
+                    entryItem.setCustomName(dto.getRawInput());
+                } else {
+                    // Đề phòng Android không gửi rawInput, ta lấy luôn tên foodName
+                    entryItem.setRawInput(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
+                    entryItem.setCustomName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
+                }
+                entryItem.setCaloriesPerServing(foodItem.getCalories());
+                entryItem.setProteinG(foodItem.getProteinG());
+                entryItem.setCarbsG(foodItem.getCarbsG());
+                entryItem.setFatG(foodItem.getFatG());
+                entryItem.setFiberG(foodItem.getFiberG());
+                entryItem.setVitaminAMcg(foodItem.getVitaminAMcg());
+                entryItem.setVitaminB12Mcg(foodItem.getVitaminB12Mcg());
+                entryItem.setVitaminCMg(foodItem.getVitaminCMg());
+                entryItem.setVitaminDMcg(foodItem.getVitaminDMcg());
+                entryItem.setIronMg(foodItem.getIronMg());
+                entryItem.setCalciumMg(foodItem.getCalciumMg());
+                entryItem.setPotassiumMg(foodItem.getPotassiumMg());
 
-            entryItem.setCaloriesPerServing(foodItem.getCalories());
-            entryItem.setProteinG(foodItem.getProteinG());
-            entryItem.setCarbsG(foodItem.getCarbsG());
-            entryItem.setFatG(foodItem.getFatG());
-            entryItem.setFiberG(foodItem.getFiberG());
-            entryItem.setVitaminAMcg(foodItem.getVitaminAMcg());
-            entryItem.setVitaminB12Mcg(foodItem.getVitaminB12Mcg());
-            entryItem.setVitaminCMg(foodItem.getVitaminCMg());
-            entryItem.setVitaminDMcg(foodItem.getVitaminDMcg());
-            entryItem.setIronMg(foodItem.getIronMg());
-            entryItem.setCalciumMg(foodItem.getCalciumMg());
-            entryItem.setPotassiumMg(foodItem.getPotassiumMg());
+                entryItem.setSource("image");
+                if (imageUrls != null) {
+                    entryItem.setImageUrls(imageUrls);
+                }
 
-            entryItem.setSource("image");
-            if (imageUrls != null) {
-                entryItem.setImageUrls(imageUrls);
+                entryItem.setDeleted(false); // THÊM DÒNG NÀY
+
+                itemsToSave.add(entryItem);
             }
 
-            entryItem.setDeleted(false); // THÊM DÒNG NÀY
-
-            itemsToSave.add(entryItem);
+            foodEntryItemRepository.saveAll(itemsToSave);
+            dailySummaryService.recalculateDailySummary(userId, date);
         }
-
-        foodEntryItemRepository.saveAll(itemsToSave);
-        dailySummaryService.recalculateDailySummary(userId, date);
-    }
 
     public List<FoodEntryItem> getMealItems(Long userId, LocalDate date, String mealType) {
         Optional<FoodEntry> entry = foodEntryRepository
