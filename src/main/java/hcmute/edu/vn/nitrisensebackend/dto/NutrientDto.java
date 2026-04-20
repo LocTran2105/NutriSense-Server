@@ -193,5 +193,9 @@ public class NutrientDto {
 
     @JsonProperty("question")
     private String question; // Câu hỏi AI muốn hỏi lại người dùng
+    @JsonProperty("raw_input")
 
+    private String rawInput; // THÊM BIẾN NÀY ĐỂ HỨNG DỮ LIỆU TỪ ANDROID
+    public String getRawInput() { return rawInput; }
+    public void setRawInput(String rawInput) { this.rawInput = rawInput; }
 }
