@@ -13,14 +13,8 @@ import hcmute.edu.vn.nitrisensebackend.enums.ChatSender;
 import hcmute.edu.vn.nitrisensebackend.repository.ChatMessageRepository;
 import hcmute.edu.vn.nitrisensebackend.repository.ExerciseTestRepository;
 import hcmute.edu.vn.nitrisensebackend.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,29 +29,21 @@ public class ChatService {
     private final DailySummaryService dailySummaryService;
     private final ObjectMapper mapper;
     private final UserRepository userRepository;
-    private final RestTemplate restTemplate;
     private final MealService mealService;
-
-    // THÊM REPOSITORY THỂ LỰC
     private final ExerciseTestRepository exerciseTestRepository;
-
-    @Value("${deepseek.api.key}")
-    private String deepseekApiKey;
 
     public ChatService(ChatMessageRepository chatRepository,
                        GeminiService geminiService,
                        DailySummaryService dailySummaryService,
                        ObjectMapper mapper,
                        UserRepository userRepository,
-                       RestTemplate restTemplate,
                        MealService mealService,
-                       ExerciseTestRepository exerciseTestRepository) { // Tiêm vào Constructor
+                       ExerciseTestRepository exerciseTestRepository) {
         this.chatRepository = chatRepository;
         this.geminiService = geminiService;
         this.dailySummaryService = dailySummaryService;
         this.mapper = mapper;
         this.userRepository = userRepository;
-        this.restTemplate = restTemplate;
         this.mealService = mealService;
         this.exerciseTestRepository = exerciseTestRepository;
     }
@@ -95,16 +81,14 @@ public class ChatService {
         String deficitContext = buildDailyNutrientDeficitContext(userId, user);
         contextBuilder.append(deficitContext);
 
-        // ========================================================
-        // BƠM THÔNG TIN THỂ LỰC (MỚI THÊM)
-        // ========================================================
+        // BƠM THÔNG TIN THỂ LỰC
         try {
             List<ExerciseTest> recentTests = exerciseTestRepository.findTop10ByUserIdOrderByTestDateDescTestIdDesc(userId);
             if (recentTests != null && !recentTests.isEmpty()) {
                 contextBuilder.append("- Đánh giá thể lực gần đây của user:\n");
                 for (ExerciseTest test : recentTests) {
                     String testName = test.getTestType();
-                    // Việt hóa tên bài tập giống như ở Frontend
+                    // Việt hóa tên bài tập
                     if ("pushups".equals(testName)) testName = "Hít đất";
                     else if ("plank_seconds".equals(testName)) testName = "Plank";
                     else if ("situps".equals(testName)) testName = "Gập bụng";
@@ -155,7 +139,7 @@ public class ChatService {
                 "  \"context_data\": {}\n" +
                 "}";
 
-        // 4. GỌI AI VÀ XỬ LÝ FALLBACK
+        // 4. GỌI AI VÀ XỬ LÝ FALLBACK (2 KEY GEMINI)
         ChatMessage aiMsg = new ChatMessage();
         aiMsg.setUserId(userId);
         aiMsg.setSender(ChatSender.AI);
@@ -163,23 +147,23 @@ public class ChatService {
 
         String aiJson = null;
         try {
-            aiJson = geminiService.generateChatResponse(systemPrompt, userText);
+            // Thử bằng Key chính (useFallback = false)
+            aiJson = geminiService.generateChatResponse(systemPrompt, userText, false);
         } catch (Exception e) {
-            System.err.println("[ChatService] Gemini lỗi/quá tải. Chuyển sang DeepSeek...");
+            System.err.println("[ChatService] Gemini lỗi/quá tải (Key 1). Đang chuyển sang Key 2...");
             try {
-                aiJson = callDeepSeekFallback(systemPrompt, userText);
-            } catch (Exception deepSeekEx) {
-                System.err.println("[ChatService] DeepSeek cũng lỗi: " + deepSeekEx.getMessage());
+                // Thử bằng Key dự phòng (useFallback = true)
+                aiJson = geminiService.generateChatResponse(systemPrompt, userText, true);
+                System.out.println("[ChatService] Key Gemini 2 đã cứu cánh thành công!");
+            } catch (Exception fallbackEx) {
+                System.err.println("[ChatService] Cả 2 Key Gemini đều quá tải: " + fallbackEx.getMessage());
             }
         }
 
         if (aiJson != null) {
             try {
-                String cleanJson = aiJson.trim();
-                if (cleanJson.startsWith("```json")) cleanJson = cleanJson.substring(7);
-                else if (cleanJson.startsWith("```")) cleanJson = cleanJson.substring(3);
-                if (cleanJson.endsWith("```")) cleanJson = cleanJson.substring(0, cleanJson.length() - 3);
-                cleanJson = cleanJson.trim();
+                // Chuẩn hóa chuỗi JSON cực kỳ an toàn
+                String cleanJson = aiJson.replaceAll("^```json\\s*", "").replaceAll("^```\\s*", "").replaceAll("```$", "").trim();
 
                 JsonNode root = mapper.readTree(cleanJson);
 
@@ -191,12 +175,12 @@ public class ChatService {
                 }
             } catch (Exception parseEx) {
                 System.err.println("[ChatService] Lỗi Parse JSON: " + parseEx.getMessage());
-                aiMsg.setMessageText(aiJson);
+                aiMsg.setMessageText(aiJson); // Lưu text thuần nếu bể định dạng
                 aiMsg.setMessageType(ChatMessageType.CHAT);
             }
         } else {
             aiMsg.setMessageType(ChatMessageType.WARNING);
-            aiMsg.setMessageText("Hệ thống AI đang bận hoặc quá tải. Vui lòng thử lại sau ít phút nhé!");
+            aiMsg.setMessageText("Hệ thống AI đang quá tải ở cả 2 kênh dự phòng. Bạn vui lòng thử lại sau ít phút nhé!");
         }
 
         return convertToDTO(chatRepository.save(aiMsg));
@@ -267,52 +251,6 @@ public class ChatService {
 
     private String fmt(double value) {
         return BigDecimal.valueOf(value).setScale(1, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
-    }
-
-    // ========================================================
-    // HÀM GỌI DEEPSEEK THAY THẾ GEMINI
-    // ========================================================
-    private String callDeepSeekFallback(String systemPrompt, String userText) throws Exception {
-        String url = "https://api.deepseek.com/chat/completions";
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "deepseek-chat");
-
-        List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", systemPrompt));
-        messages.add(Map.of("role", "user", "content", userText));
-        requestBody.put("messages", messages);
-
-        requestBody.put("response_format", Map.of("type", "json_object"));
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(deepseekApiKey);
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-
-        if (response.getBody() == null || response.getBody().trim().isEmpty()) {
-            throw new RuntimeException("DeepSeek trả về HTTP body rỗng");
-        }
-
-        JsonNode root = mapper.readTree(response.getBody());
-        JsonNode choices = root.path("choices");
-
-        if (!choices.isArray() || choices.isEmpty()) {
-            throw new RuntimeException("DeepSeek trả về JSON không hợp lệ (thiếu 'choices')");
-        }
-
-        JsonNode messageNode = choices.get(0).path("message");
-        if (messageNode.isMissingNode() || messageNode.path("content").isNull()) {
-            throw new RuntimeException("DeepSeek trả về nội dung tin nhắn rỗng");
-        }
-
-        String content = messageNode.path("content").asText().trim();
-        if (content.isEmpty()) {
-            throw new RuntimeException("DeepSeek sinh ra chuỗi content rỗng");
-        }
-
-        return content;
     }
 
     private ChatMessageType safeParseEnum(String value) {

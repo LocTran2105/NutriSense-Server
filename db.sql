@@ -251,7 +251,6 @@ CREATE TABLE exercise_tests (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_user_test (user_id, test_date, test_type)
 );
-
 -- ============================================
 -- 11. water_intake (đổi tên date -> intake_date)
 -- ============================================
@@ -320,7 +319,6 @@ CREATE TABLE daily_deficits (
     INDEX idx_summary (summary_id),
     UNIQUE KEY unique_summary_nutrient (summary_id, nutrient_id)
 );
-
 -- ============================================
 -- 15. reports (thêm total_days, compliance_score)
 -- ============================================
@@ -410,7 +408,6 @@ CREATE TABLE ai_processing_logs (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_user_ai (user_id, created_at)
 );
-
 -- ============================================
 -- 20. scan_history
 -- ============================================
@@ -506,7 +503,8 @@ CREATE TABLE chat_messages (
     INDEX idx_user_chat_unread (user_id, is_read, created_at),
     INDEX idx_user_chat_type (user_id, message_type)
 );
-
+select * from chat_messages
+select * from users
 -- ============================================
 -- TRIGGERS
 -- ============================================
@@ -722,3 +720,5 @@ select * from users;
 select * from daily_summaries;
 select * from food_entry_items;
 select * from user_goals;
+select * from exercise_tests;
+select * from chat_messages

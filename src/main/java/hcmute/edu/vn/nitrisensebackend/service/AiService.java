@@ -21,7 +21,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -44,7 +43,7 @@ public class AiService {
 
     @Value("${gemini.api.url}") private String apiUrl;
     @Value("${gemini.api.key}") private String apiKey;
-    @Value("${deepseek.api.key}") private String deepseekApiKey;
+    @Value("${gemini.api.key.fallback}") private String fallbackKey;
 
     public AiService(RestTemplate restTemplate, AiProcessingLogRepository logRepo, FoodItemRepository itemRepo) {
         this.restTemplate = restTemplate;
@@ -53,25 +52,25 @@ public class AiService {
     }
 
     // ==========================================================
-    // SCHEMA CHUNG
+    // SCHEMA CHUNG - ĐÃ FIX TYPE THÀNH CHỮ IN HOA CHO GEMINI 2.5
     // ==========================================================
     private Map<String, Object> getNutrientResponseSchema(boolean isArray) {
         Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("status", Map.of("type", "string", "description", "Chỉ được trả 'success' hoặc 'ask_user'"));
-        properties.put("food_name", Map.of("type", "string", "description", "Tên món ăn. Nếu status là ask_user thì để rỗng"));
-        properties.put("calories", Map.of("type", "number"));
-        properties.put("protein_g", Map.of("type", "number"));
-        properties.put("carbs_g", Map.of("type", "number"));
-        properties.put("fat_g", Map.of("type", "number"));
-        properties.put("fiber_g", Map.of("type", "number"));
-        properties.put("vitamin_a_mcg", Map.of("type", "number"));
-        properties.put("vitamin_b12_mcg", Map.of("type", "number"));
-        properties.put("vitamin_c_mg", Map.of("type", "number"));
-        properties.put("vitamin_d_mcg", Map.of("type", "number"));
-        properties.put("iron_mg", Map.of("type", "number"));
-        properties.put("calcium_mg", Map.of("type", "number"));
-        properties.put("potassium_mg", Map.of("type", "number"));
-        properties.put("question", Map.of("type", "string", "description", "Câu hỏi ngược lại cho user"));
+        properties.put("status", Map.of("type", "STRING", "description", "Chỉ được trả 'success' hoặc 'ask_user'"));
+        properties.put("food_name", Map.of("type", "STRING", "description", "Tên món ăn. Nếu status là ask_user thì để rỗng"));
+        properties.put("calories", Map.of("type", "NUMBER"));
+        properties.put("protein_g", Map.of("type", "NUMBER"));
+        properties.put("carbs_g", Map.of("type", "NUMBER"));
+        properties.put("fat_g", Map.of("type", "NUMBER"));
+        properties.put("fiber_g", Map.of("type", "NUMBER"));
+        properties.put("vitamin_a_mcg", Map.of("type", "NUMBER"));
+        properties.put("vitamin_b12_mcg", Map.of("type", "NUMBER"));
+        properties.put("vitamin_c_mg", Map.of("type", "NUMBER"));
+        properties.put("vitamin_d_mcg", Map.of("type", "NUMBER"));
+        properties.put("iron_mg", Map.of("type", "NUMBER"));
+        properties.put("calcium_mg", Map.of("type", "NUMBER"));
+        properties.put("potassium_mg", Map.of("type", "NUMBER"));
+        properties.put("question", Map.of("type", "STRING", "description", "Câu hỏi ngược lại cho user"));
 
         List<String> requiredFields = Arrays.asList(
                 "status", "food_name", "calories", "protein_g", "carbs_g", "fat_g",
@@ -81,10 +80,10 @@ public class AiService {
 
         Map<String, Object> schema = new HashMap<>();
         if (isArray) {
-            schema.put("type", "array");
-            schema.put("items", Map.of("type", "object", "properties", properties, "required", requiredFields));
+            schema.put("type", "ARRAY");
+            schema.put("items", Map.of("type", "OBJECT", "properties", properties, "required", requiredFields));
         } else {
-            schema.put("type", "object");
+            schema.put("type", "OBJECT");
             schema.put("properties", properties);
             schema.put("required", requiredFields);
         }
@@ -92,7 +91,7 @@ public class AiService {
     }
 
     // ==========================================================
-    // 1. NHẬN DIỆN TEXT (HỖ TRỢ NHIỀU MÓN)
+    // 1. NHẬN DIỆN TEXT (HỖ TRỢ NHIỀU MÓN) - PROMPT GỐC CỦA BẠN
     // ==========================================================
     public AiAnalyzeResult analyzeFood(Long userId, String userInput) {
         String cleanJson = "[]";
@@ -104,13 +103,24 @@ public class AiService {
                             "2. BẮT BUỘC ask_user NẾU input không phải đồ ăn. KHÔNG ask_user nếu có thể suy luận món phổ biến.\n" +
                             "3. Phải tính toán kỹ lưỡng vi chất. KHÔNG gán 0.0 nếu món đó thực tế có chứa chất đó.";
 
-            // Đổi tham số cuối thành TRUE để ép AI trả về mảng
             Map<String, Object> requestBody = createGeminiRestRequest(instructionText, userInput, null, true);
 
-            ResponseEntity<String> response = sendRequestToGemini(requestBody);
+            ResponseEntity<String> response;
+            try {
+                // Thử Key 1
+                response = sendRequestToGemini(requestBody, false);
+            } catch (Exception e1) {
+                logger.warn("[AiService] Key 1 lỗi/quá tải (Text). Đang thử Key 2...");
+                try {
+                    // Thử Key 2
+                    response = sendRequestToGemini(requestBody, true);
+                } catch (Exception e2) {
+                    throw new RuntimeException("Cả 2 Key Gemini đều quá tải: " + e2.getMessage());
+                }
+            }
+
             cleanJson = parseSafe(response.getBody());
 
-            // Đọc kết quả thành List
             List<NutrientDto> dtos = mapper.readValue(cleanJson, new TypeReference<List<NutrientDto>>() {});
             saveLog(userId, "text", userInput, cleanJson, null);
 
@@ -141,7 +151,7 @@ public class AiService {
     }
 
     // ==========================================================
-    // 2. NHẬN DIỆN ẢNH
+    // 2. NHẬN DIỆN ẢNH - PROMPT GỐC CỦA BẠN
     // ==========================================================
     public List<NutrientDto> analyzeFoodImage(Long userId, MultipartFile file) {
         String cleanJson = "[]";
@@ -154,7 +164,20 @@ public class AiService {
                             "QUY TẮC: Phân tách từng món. Tự ước lượng khẩu phần. TUYỆT ĐỐI KHÔNG hỏi về số lượng. Tính vi chất đầy đủ.";
 
             Map<String, Object> requestBody = createGeminiRestRequest(instructionImage, null, base64Image, true);
-            ResponseEntity<String> response = sendRequestToGemini(requestBody);
+
+            ResponseEntity<String> response;
+            try {
+                // Thử Key 1
+                response = sendRequestToGemini(requestBody, false);
+            } catch (Exception e1) {
+                logger.warn("[AiService] Key 1 lỗi/quá tải (Image). Đang thử Key 2...");
+                try {
+                    // Thử Key 2
+                    response = sendRequestToGemini(requestBody, true);
+                } catch (Exception e2) {
+                    throw new RuntimeException("Cả 2 Key Gemini đều quá tải khi nhận diện ảnh");
+                }
+            }
 
             cleanJson = parseSafe(response.getBody());
             List<NutrientDto> result = mapper.readValue(cleanJson, new TypeReference<List<NutrientDto>>() {});
@@ -172,9 +195,8 @@ public class AiService {
     }
 
     // ==========================================================
-    // 3. TẠO CÂU NHẮC NHỞ DINH DƯỠNG CUỐI NGÀY (CÓ DEEPSEEK FALLBACK)
+    // 3. TẠO CÂU NHẮC NHỞ DINH DƯỠNG CUỐI NGÀY
     // ==========================================================
-    // Đổi tham số thứ 2 thành UserProfile profile
     public ReminderResponseDto generateDailyReminder(Long userId, User profile, List<FoodEntryItem> todayItems, DailySummary summary) {
         List<FoodEntryItem> safeItems = todayItems != null ? todayItems : Collections.emptyList();
 
@@ -185,9 +207,6 @@ public class AiService {
             totalCalcium += item.getCalciumMg() != null ? item.getCalciumMg().doubleValue() : 0.0;
         }
 
-        // ==========================================
-        // ĐÂY LÀ ĐOẠN CẦN SỬA: LẤY MỤC TIÊU TỪ PROFILE
-        // ==========================================
         double targetCal = 2000.0, targetWater = 2000.0, targetPro = 150.0;
 
         if (profile != null) {
@@ -199,7 +218,6 @@ public class AiService {
                 targetWater = profile.getWaterGoalMl().doubleValue();
             }
         }
-        // ==========================================
 
         double targetVitC = 90.0, targetIron = 18.0, targetCalcium = 1000.0;
 
@@ -207,11 +225,9 @@ public class AiService {
         double actualPro = (summary != null && summary.getTotalProteinG() != null) ? summary.getTotalProteinG().doubleValue() : 0.0;
         double actualWater = (summary != null && summary.getTotalWaterMl() != null) ? summary.getTotalWaterMl().doubleValue() : 0.0;
 
-        // ... (Phần bên dưới List<String> deficitLines = new ArrayList<>(); giữ nguyên không đổi)
         List<String> deficitLines = new ArrayList<>();
         List<String> foodTips = new ArrayList<>();
 
-        // Vẫn dùng Pageable(0,2) để mỗi chất chỉ gợi ý tối đa 2 món, tránh việc 1 chất in ra 10 món
         Pageable topTwo = PageRequest.of(0, 2);
 
         if (actualCal < targetCal) {
@@ -263,7 +279,6 @@ public class AiService {
     }
 
     private String buildShortReminder(List<String> deficitLines) {
-        // Hiện TẤT CẢ các chất thiếu, ngăn cách bằng dấu chấm phẩy
         return "Bạn đang thiếu: " + String.join("; ", deficitLines) + ".";
     }
 
@@ -273,7 +288,6 @@ public class AiService {
 
         sb.append("Bạn đang ").append(summary).append(".\n");
 
-        // Hiện TẤT CẢ gợi ý món ăn
         if (!foodTips.isEmpty()) {
             sb.append("\n💡 Gợi ý để bù chất:\n- ");
             sb.append(String.join("\n- ", foodTips));
@@ -285,20 +299,13 @@ public class AiService {
         return BigDecimal.valueOf(value).setScale(1, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
     }
 
-    private String executeDeepSeekFallback(String prompt, String fallbackMessage) {
-        try {
-            return callDeepSeek(prompt);
-        } catch (Exception ex) {
-            logger.error("[DeepSeek] Chữa cháy thất bại: {}", ex.getMessage());
-            return fallbackMessage;
-        }
-    }
-
     // ==========================================================
     // UTILS: BUILD REQUEST & PARSE CHUNG
     // ==========================================================
-    private ResponseEntity<String> sendRequestToGemini(Map<String, Object> requestBody) {
-        String urlWithKey = apiUrl + "?key=" + apiKey;
+    private ResponseEntity<String> sendRequestToGemini(Map<String, Object> requestBody, boolean useFallback) {
+        String currentKey = useFallback ? fallbackKey : apiKey;
+        String urlWithKey = apiUrl + "?key=" + currentKey;
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
@@ -321,35 +328,6 @@ public class AiService {
         genConfig.put("response_schema", getNutrientResponseSchema(isArray));
 
         return Map.of("contents", Collections.singletonList(Map.of("parts", parts)), "generationConfig", genConfig);
-    }
-
-    private Map<String, Object> createSimpleRequest(String prompt) {
-        List<Map<String, Object>> parts = new ArrayList<>();
-        parts.add(Map.of("text", prompt));
-        Map<String, Object> genConfig = new HashMap<>();
-        genConfig.put("response_mime_type", "text/plain");
-        return Map.of("contents", Collections.singletonList(Map.of("parts", parts)), "generationConfig", genConfig);
-    }
-
-    private String callDeepSeek(String prompt) throws Exception {
-        String url = "https://api.deepseek.com/v1/chat/completions";
-        Map<String, Object> body = new HashMap<>();
-        body.put("model", "deepseek-chat");
-        body.put("messages", Collections.singletonList(Map.of("role", "user", "content", prompt)));
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(deepseekApiKey);
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-
-        JsonNode root = mapper.readTree(response.getBody());
-        JsonNode choices = root.path("choices");
-        if (choices.isArray() && !choices.isEmpty()) {
-            return choices.get(0).path("message").path("content").asText().trim();
-        }
-        throw new RuntimeException("DeepSeek trả về JSON rỗng");
     }
 
     private String parseSafe(String body) throws Exception {

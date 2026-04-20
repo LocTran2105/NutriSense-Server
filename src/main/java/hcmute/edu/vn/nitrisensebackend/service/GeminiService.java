@@ -15,6 +15,9 @@ public class GeminiService {
     @Value("${gemini.api.url}") private String apiUrl;
     @Value("${gemini.api.key}") private String apiKey;
 
+    // THÊM KEY DỰ PHÒNG TỪ APPLICATION.PROPERTIES
+    @Value("${gemini.api.key.fallback}") private String fallbackKey;
+
     // Inject từ Spring Boot
     private final ObjectMapper mapper;
     private final RestTemplate restTemplate;
@@ -24,21 +27,26 @@ public class GeminiService {
         this.restTemplate = restTemplate;
     }
 
-    public String generateChatResponse(String systemInstruction, String userText) throws Exception {
+    // THÊM THAM SỐ useFallback ĐỂ CHATSERVICE GỌI ĐỔI KEY
+    public String generateChatResponse(String systemInstruction, String userText, boolean useFallback) throws Exception {
+        // Lựa chọn Key dựa vào tình trạng lỗi
+        String currentKey = useFallback ? fallbackKey : apiKey;
+
+        // BẮT BUỘC DÙNG IN HOA CHO TYPE THEO CHUẨN GOOGLE API GEMINI 2.5
+        Map<String, Object> responseSchema = new LinkedHashMap<>();
+        responseSchema.put("type", "OBJECT");
+
         Map<String, Object> schemaProps = new LinkedHashMap<>();
-        // Đã cập nhật đầy đủ các loại Enum theo chuẩn DB
+        // Đã cập nhật đầy đủ các loại Enum theo chuẩn DB và chuyển type thành IN HOA
         schemaProps.put("message_type", Map.of(
-                "type", "string",
+                "type", "STRING",
                 "description", "Chỉ chọn: CHAT, FOLLOWUP, REMINDER, WARNING, ACHIEVEMENT, SYSTEM_NOTICE"
         ));
-        schemaProps.put("response_text", Map.of("type", "string"));
-        schemaProps.put("context_data", Map.of("type", "object"));
+        schemaProps.put("response_text", Map.of("type", "STRING"));
+        schemaProps.put("context_data", Map.of("type", "OBJECT"));
 
-        Map<String, Object> responseSchema = Map.of(
-                "type", "object",
-                "properties", schemaProps,
-                "required", Arrays.asList("message_type", "response_text")
-        );
+        responseSchema.put("properties", schemaProps);
+        responseSchema.put("required", Arrays.asList("message_type", "response_text"));
 
         Map<String, Object> textPart = Map.of("text", systemInstruction + "\nUser nói: " + userText);
         Map<String, Object> content = Map.of("parts", Collections.singletonList(textPart));
@@ -51,8 +59,10 @@ public class GeminiService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+
+        // Gửi request với currentKey đã được chọn
         ResponseEntity<String> response = restTemplate.exchange(
-                apiUrl + "?key=" + apiKey, HttpMethod.POST, new HttpEntity<>(requestBody, headers), String.class);
+                apiUrl + "?key=" + currentKey, HttpMethod.POST, new HttpEntity<>(requestBody, headers), String.class);
 
         JsonNode root = mapper.readTree(response.getBody());
         JsonNode candidates = root.path("candidates");
