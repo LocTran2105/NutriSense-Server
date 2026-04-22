@@ -1,0 +1,59 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Người dùng|
+start
+:Mở màn hình Giấc ngủ\n(SleepActivity);
+:Chọn các loại âm thanh\n(Mưa, Gió, Lửa...);
+:Kéo thanh chỉnh âm lượng;
+
+|#LightYellow|SleepActivity (UI)|
+:Lưu trạng thái vào SharedPreferences;
+:Gửi Intent (ACTION_PLAY_TRACK) \nhoặc (ACTION_UPDATE_VOLUME);
+
+|#LightGreen|SleepMusicService (Background)|
+:Khởi tạo / Cập nhật \nMediaPlayer tương ứng;
+:Phát nhạc lặp lại (Looping);
+
+|Người dùng|
+:Chọn thời gian hẹn giờ đếm ngược;
+:Bấm nút Play (Bắt đầu ngủ);
+
+|#LightYellow|SleepActivity (UI)|
+:Đổi icon sang Pause;
+:Chạy hiệu ứng đĩa xoay (Animation);
+:Gửi Intent (ACTION_START_TIMER);
+
+|#LightGreen|SleepMusicService (Background)|
+:Tạo Foreground Notification \nđể giữ Service sống;
+:Khởi động CountDownTimer;
+
+' Vòng lặp đếm ngược
+while (Đang đếm ngược?) is (Còn thời gian)
+  :Gửi Broadcast (ACTION_UPDATE_TIMER);
+  |#LightYellow|SleepActivity (UI)|
+  :Cập nhật đồng hồ trên màn hình;
+  |#LightGreen|SleepMusicService (Background)|
+endwhile (Hết giờ)
+
+:CountDownTimer.onFinish();
+:Dừng tất cả MediaPlayer;
+:Xóa Notification;
+:Gửi Broadcast (FINISH_EVENT);
+
+|#LightYellow|SleepActivity (UI)|
+:Nhận tín hiệu kết thúc;
+:Dừng hiệu ứng đĩa xoay;
+:Reset giao diện (Trạng thái STOPPED);
+
+|Người dùng|
+:Ngủ ngon (Ứng dụng đã im lặng);
+stop
+@endumlz`

@@ -1,0 +1,73 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor LightBlue
+  BorderColor DarkBlue
+  ArrowColor Black
+}
+
+actor "Người dùng" as User
+actor "Firebase Auth" as Firebase << Hệ thống ngoài >>
+actor "Gemini AI API" as Gemini << Hệ thống ngoài >>
+
+package "Hệ thống NitriSense" {
+
+    ' Nhóm Tài khoản
+    usecase "Đăng nhập" as UC_Login
+    usecase "Đăng ký" as UC_Register
+    usecase "Khôi phục mật khẩu" as UC_ForgotPwd
+
+    ' Nhóm Hồ sơ
+    usecase "Làm khảo sát thể trạng" as UC_Survey
+    usecase "Quản lý hồ sơ cá nhân" as UC_Profile
+
+    ' Nhóm Dinh dưỡng
+    usecase "Xem dashboard tổng kết" as UC_Dashboard
+    usecase "Quản lý nhật ký ăn uống" as UC_Meal
+    usecase "Theo dõi lượng nước" as UC_Water
+
+    ' Nhóm AI
+    usecase "Phân tích món ăn bằng AI" as UC_AI_Analyze
+    usecase "Nhận diện qua hình ảnh" as UC_AI_Image
+    usecase "Nhận diện qua văn bản" as UC_AI_Text
+    usecase "Nhận diện qua giọng nói" as UC_Voice
+    usecase "Trò chuyện với trợ lý ảo Vita" as UC_Chatbot
+
+    ' Nhóm Lịch trình & Giấc ngủ
+    usecase "Quản lý lịch trình nhắc nhở" as UC_Schedule
+    usecase "Nghe nhạc thư giãn và ngủ" as UC_Sleep
+    usecase "Cấu hình thông báo" as UC_Settings
+}
+
+' Quan hệ giữa User và các Use case
+User --> UC_Login
+User --> UC_Register
+User --> UC_Survey
+User --> UC_Profile
+User --> UC_Dashboard
+User --> UC_Meal
+User --> UC_Water
+User --> UC_AI_Analyze
+User --> UC_Chatbot
+User --> UC_Schedule
+User --> UC_Sleep
+User --> UC_Settings
+
+' Quan hệ Extend / Include bên trong hệ thống
+UC_ForgotPwd .> UC_Login : <<extend>>
+UC_AI_Image .> UC_AI_Analyze : <<extend>>
+UC_AI_Text .> UC_AI_Analyze : <<extend>>
+UC_Voice .> UC_AI_Analyze : <<extend>>
+UC_Survey .> UC_Register : <<include>>
+
+' Quan hệ với Hệ thống ngoài (Firebase)
+UC_Login --> Firebase
+UC_Register --> Firebase
+UC_ForgotPwd --> Firebase
+
+' Quan hệ với Hệ thống ngoài (Gemini)
+UC_AI_Analyze --> Gemini
+UC_Chatbot --> Gemini
+
+@enduml

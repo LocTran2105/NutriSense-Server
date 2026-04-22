@@ -1,0 +1,69 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Người dùng (Android)|
+start
+:Mở ứng dụng;
+if (Đã lưu phiên đăng nhập?) then (Có)
+  :Lấy uid và email từ Local;
+else (Không)
+  :Chọn đăng nhập hoặc đăng ký;
+  if (Hành động?) then (Đăng ký)
+    :Nhập email, password, xác nhận password;
+    |#MistyRose|Firebase Auth|
+    :Tạo tài khoản mới bằng Email/Pass;
+  else (Đăng nhập)
+    |Người dùng (Android)|
+    :Nhập email, password \nhoặc chọn Google Sign-In;
+    |Firebase Auth|
+    :Xác thực tài khoản;
+  endif
+
+  |Firebase Auth|
+  if (Thành công?) then (Thất bại)
+    |Người dùng (Android)|
+    :Hiển thị lỗi (Toast);
+    stop
+  else (Thành công)
+    :Trả về định danh uid và email;
+  endif
+endif
+
+|Người dùng (Android)|
+:Đóng gói UserSyncRequest (uid, email);
+:Gọi API POST /api/users/sync;
+
+|#LightYellow|Spring Boot (Server)|
+:UserController tiếp nhận Request;
+:Tìm kiếm user theo uid (findByAuthUid);
+
+|#LightGreen|MySQL (Database)|
+:Truy vấn bảng `users`;
+
+|Spring Boot (Server)|
+if (User đã tồn tại?) then (Đã tồn tại (Login))
+  :Lấy thông tin Profile hiện tại;
+else (Chưa tồn tại (Register))
+  :Khởi tạo đối tượng User mới;
+  |MySQL (Database)|
+  :Thực thi lệnh INSERT INTO `users`;
+  |Spring Boot (Server)|
+endif
+:Trả về JSON (UserProfile);
+
+|Người dùng (Android)|
+:Lưu `userId` vào SessionManager;
+if (Thiếu Chiều cao / Cân nặng?) then (Có)
+  :Chuyển hướng sang\nKhảo sát (SurveyActivity);
+else (Không)
+  :Chuyển hướng sang\nTrang chủ (MainActivity);
+endif
+stop
+@enduml

@@ -1,0 +1,44 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Người dùng|
+start
+:Mở tab AI Phân tích;
+:Chụp ảnh bằng camera\nhoặc chọn từ thư viện\nhoặc dùng giọng nói;
+:Bấm "Phân tích";
+
+|Android (Client)|
+:Nén và chuyển ảnh thành MultipartFile;
+:Gọi API POST /api/ai/analyze-image;
+
+|#LightYellow|Spring Boot (Server)|
+:AiController tiếp nhận ảnh;
+:Kiểm tra file hợp lệ;
+:AiService tạo Prompt yêu cầu\nphân tích thực phẩm;
+
+|#LightPink|Gemini AI (API Ngoài)|
+:Nhận ảnh và Prompt (Multimodal);
+:Nhận diện hình ảnh (Computer Vision);
+:Trả về mảng JSON cấu trúc Nutrient;
+
+|#LightYellow|Spring Boot (Server)|
+:AiService ép kiểu JSON thành \nList<NutrientDto>;
+|#LightGreen|MySQL (Database)|
+:Lưu lịch sử nhận diện vào \nbảng `ai_processing_logs`;
+
+|#LightYellow|Spring Boot (Server)|
+:Trả về danh sách NutrientDto\n(HTTP 200 OK);
+
+|Android (Client)|
+:Hiển thị danh sách món ăn\nkèm Calo, Macro...;
+|Người dùng|
+:Xác nhận và bấm "Lưu vào nhật ký";
+stop
+@enduml

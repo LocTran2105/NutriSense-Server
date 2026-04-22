@@ -1,0 +1,100 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor DarkBlue
+}
+
+package "Android Client (hcmute.edu.vn.nitrisense)" {
+    class AiAssistantActivity {
+        - imageUri: Uri
+        + startCamera()
+        + pickFromGallery()
+        - analyzeImage(File)
+    }
+
+    class ChatBottomSheet {
+        - etChatInput: EditText
+        - chatAdapter: ChatAdapter
+        + startVoiceRecognition()
+        - sendMessage()
+        - loadChatHistory()
+    }
+
+    interface ApiService {
+        + analyzeImage(Long, MultipartBody.Part): Call<List<NutrientDto>>
+        + sendMessage(ChatSendRequest): Call<ChatMessageDTO>
+    }
+
+    class ChatSendRequest <<DTO>> {
+        + userId: Long
+        + message: String
+    }
+
+    class NutrientDto <<DTO>> {
+        + foodName: String
+        + calories: Double
+        + proteinG: Double
+    }
+}
+
+package "Spring Boot Server (hcmute.edu.vn.nitrisensebackend)" {
+
+    class AiController {
+        - aiService: AiService
+        + analyzeImage(Long, MultipartFile): ResponseEntity<?>
+    }
+
+    class ChatController {
+        - chatService: ChatService
+        + send(ChatSendRequest): ResponseEntity<?>
+    }
+
+    class AiService {
+        - geminiService: GeminiService
+        - aiProcessingLogRepository: AiProcessingLogRepository
+        + analyzeFoodImage(Long, MultipartFile): List<NutrientDto>
+        - saveLog(...)
+    }
+
+    class ChatService {
+        - geminiService: GeminiService
+        - chatRepository: ChatMessageRepository
+        + processUserMessage(Long, String): ChatMessageResponseDTO
+    }
+
+    class GeminiService {
+        - apiUrl: String
+        - apiKey: String
+        - restTemplate: RestTemplate
+        + generateChatResponse(String, String, boolean): String
+        + analyzeImageWithPrompt(String, MultipartFile): String
+    }
+}
+
+' =================================
+' MỐI QUAN HỆ (RELATIONSHIPS)
+' =================================
+
+' Phía Android
+AiAssistantActivity ..> ApiService : calls
+ChatBottomSheet ..> ApiService : calls
+ChatBottomSheet ..> ChatSendRequest : creates
+AiAssistantActivity ..> NutrientDto : receives
+
+' Phía Spring Boot
+AiController --> AiService : injects
+ChatController --> ChatService : injects
+
+AiService --> GeminiService : injects
+ChatService --> GeminiService : injects
+
+' Giao tiếp mạng Android -> Server
+ApiService -.> AiController : REST API (POST Image)
+ApiService -.> ChatController : REST API (POST JSON)
+
+' Giao tiếp Server -> Hệ thống ngoài
+class "Google Gemini API" as GeminiAPI
+
+GeminiService -.> GeminiAPI : HTTP POST
+@enduml

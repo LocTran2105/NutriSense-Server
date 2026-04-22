@@ -1,0 +1,58 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Hệ thống Android (Background)|
+start
+:Đến thời điểm hẹn giờ\n(Kích hoạt bởi AlarmManager);
+
+if (Loại sự kiện là gì?) then (Nhắc nhở thường\nNước / Ăn / Ngủ)
+  :ReminderReceiver thức dậy;
+  :Kiểm tra SharedPreferences\n(Có bị tắt bởi người dùng không?);
+  if (Trạng thái?) then (Đang Bật)
+    :Tạo chuỗi thông báo nội bộ\n(Ví dụ: "Nhớ uống 1 cốc nước nhé!");
+  else (Đang Tắt)
+    stop
+  endif
+
+else (Tổng kết AI)
+  :DailyAiCheckReceiver thức dậy;
+  :Kiểm tra SharedPreferences\n(Công tắc AI có đang bật?);
+  if (Trạng thái?) then (Đang Tắt)
+    stop
+  else (Đang Bật)
+    :Lấy userId hiện tại;
+    :Gọi API GET /api/ai/daily-reminder;
+
+    |#LightYellow|Spring Boot (Server)|
+    :AiReminderController tiếp nhận;
+    :Lấy DailySummary & Hồ sơ User;
+    :AiService tổng hợp Prompt gửi lên Gemini;
+
+    |#LightPink|Gemini AI|
+    :Đánh giá tổng quan dinh dưỡng ngày;
+    :Trả về notificationText và detailText;
+
+    |#LightYellow|Spring Boot (Server)|
+    :Đóng gói ReminderResponseDto;
+    :Trả về HTTP 200 OK;
+
+    |Hệ thống Android (Background)|
+    :Nhận dữ liệu từ API;
+    :Phát Broadcast Intent truyền\ndữ liệu sang ReminderReceiver;
+    :ReminderReceiver thức dậy nhận lệnh;
+  endif
+endif
+
+|Hệ thống Android (Background)|
+:Hiển thị System Notification\n(Rung/Chuông trên thanh trạng thái);
+:Lưu nội dung vào NotificationHelper\n(Để xem lại trong App);
+:Gọi AlarmHelper.scheduleExactAlarm()\nđể lên lịch lặp lại vào ngày mai;
+stop
+@enduml

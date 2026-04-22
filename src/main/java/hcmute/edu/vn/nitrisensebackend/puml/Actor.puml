@@ -1,0 +1,52 @@
+@startuml
+' Cấu hình giao diện cho biểu đồ đẹp hơn
+skinparam actorStyle hollow
+skinparam NoteBackgroundColor #FEFEFE
+skinparam NoteBorderColor #00529B
+left to right direction
+
+' ==========================================
+' 1. KHAI BÁO CÁC ACTOR
+' ==========================================
+actor "Người dùng\n" as User
+actor "Firebase Authentication" as Firebase << Hệ thống đám mây >>
+actor "Gemini API" as AI << API bên ngoài >>
+actor "Hệ thống thời gian\n(Alarm/Timer)" as Timer << Hệ thống thiết bị >>
+
+' ==========================================
+' 2. GHI CHÚ MÔ TẢ CHO TỪNG ACTOR
+' ==========================================
+note right of User
+  **Đối tượng sử dụng chính trên thiết bị Android.**
+  Thực hiện các thao tác:
+  - Quản lý hồ sơ sức khỏe.
+  - Ghi nhận nhật ký ăn uống, lượng nước.
+  - Thiết lập lịch trình cá nhân.
+  - Tương tác với chức năng AI phân tích thực phẩm và tư vấn.
+  - Test thể trạng
+end note
+
+note right of Firebase
+  **Xử lý trung gian danh tính người dùng:**
+  - Quản lý an toàn thông tin nhạy cảm (mật khẩu).
+  - Cấp phát mã định danh UID để xác thực.
+  - Hỗ trợ gửi email khôi phục mật khẩu.
+  - Xác thực quyền truy cập trước khi đồng bộ với server.
+end note
+
+note right of AI
+  **API bên ngoài tích hợp vào máy chủ:**
+  - Nhận đầu vào là hình ảnh món ăn và văn bản.
+  - Phân tích và trích xuất các chỉ số dinh dưỡng.
+  - Trả dữ liệu kết quả về hệ thống.
+end note
+
+note right of Timer
+  **Bộ đếm thời gian thực (AlarmManager, CountDownTimer):**
+  - Chạy ngầm bên trong thiết bị.
+  - Tự động kích hoạt Broadcast Receiver.
+  - Gửi thông báo nhắc nhở theo lịch.
+  - Tự động tắt nhạc khi hết giờ đếm ngược giấc ngủ.
+end note
+
+@enduml

@@ -1,0 +1,81 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor DarkBlue
+}
+
+package "hcmute.edu.vn.nitrisense.ui (Android UI)" {
+    class ProfileActivity {
+        - sharedPreferences: SharedPreferences
+        + setupButtonListeners()
+        - saveNotificationSettings()
+    }
+
+    class NotificationActivity {
+        - rvNotifications: RecyclerView
+        - adapter: NotificationAdapter
+        + onCreate()
+        - showAiDetailPopup(String, String)
+    }
+}
+
+package "hcmute.edu.vn.nitrisense.util (Helpers)" {
+    class AlarmHelper {
+        + {static} scheduleExactAlarm(Context, String, String)
+        + {static} cancelAlarm(Context, String)
+    }
+
+    class NotificationHelper {
+        + {static} saveNotification(...)
+        + {static} getUnreadCount(): int
+        + {static} getAllNotifications(): JSONArray
+    }
+}
+
+package "hcmute.edu.vn.nitrisense.receiver (Background)" {
+    class ReminderReceiver <<BroadcastReceiver>> {
+        + onReceive(Context, Intent)
+        - getMessageByEventType(String): String
+    }
+
+    class DailyAiCheckReceiver <<BroadcastReceiver>> {
+        + onReceive(Context, Intent)
+    }
+}
+
+package "hcmute.edu.vn.nitrisensebackend (Server)" {
+    class AiReminderController {
+        - aiService: AiService
+        - dailySummaryService: DailySummaryService
+        + getDailyReminder(Long): ResponseEntity<ReminderResponseDto>
+    }
+
+    class ReminderResponseDto <<DTO>> {
+        - notificationText: String
+        - detailText: String
+    }
+}
+
+' =================================
+' MỐI QUAN HỆ (RELATIONSHIPS)
+' =================================
+
+' UI -> Helper
+ProfileActivity ..> AlarmHelper : Configures Time
+NotificationActivity ..> NotificationHelper : Reads JSON History
+
+' Helper -> Receiver
+AlarmHelper ..> ReminderReceiver : Triggers (PendingIntent)
+AlarmHelper ..> DailyAiCheckReceiver : Triggers (PendingIntent)
+
+' Receiver Inter-communication
+DailyAiCheckReceiver ..> ReminderReceiver : Sends Intent (Fallback AI msg)
+ReminderReceiver ..> NotificationHelper : Saves to History
+ReminderReceiver ..> AlarmHelper : Reschedules for next day
+
+' Network Communication
+DailyAiCheckReceiver -.> AiReminderController : REST API (GET)
+AiReminderController ..> ReminderResponseDto : Returns
+DailyAiCheckReceiver ..> ReminderResponseDto : Receives
+@enduml

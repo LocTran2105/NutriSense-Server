@@ -1,0 +1,45 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Người dùng|
+start
+:Mở màn hình Đánh giá thể lực\n(FitnessTestActivity);
+:Chọn loại bài tập\n(Hít đất / Plank / Gập bụng / Chạy);
+:Nhập kết quả (số lượng/giây);\nBấm "Lưu";
+
+|Android (Frontend)|
+:Tính toán đánh giá (Xuất sắc/Tốt/Khá);\nĐóng gói vào đối tượng ExerciseTest;
+:Gọi API POST /api/fitness/log;
+
+|#LightYellow|Spring Boot (Backend)|
+:FitnessController tiếp nhận Request;
+:Tự động gán ngày hiện tại\n(request.setTestDate(LocalDate.now()));
+
+|#LightGreen|MySQL (Database)|
+:Thực thi lệnh INSERT INTO \nbảng `exercise_tests`;
+
+|#LightYellow|Spring Boot (Backend)|
+:Trả về đối tượng vừa lưu thành công;
+
+|Android (Frontend)|
+:Nhận kết quả (HTTP 200 OK);
+:Đóng Dialog và hiển thị Toast;
+:Tự động gọi lại API \nGET /api/fitness/recent;
+
+|#LightYellow|Spring Boot (Backend)|
+:Truy vấn CSDL lấy 10 bài test \ngần nhất (findTop10By...);
+:Trả về mảng JSON;
+
+|Android (Frontend)|
+:Cập nhật danh sách (RecyclerView);
+|Người dùng|
+:Nhìn thấy kết quả vừa nhập \ntrên màn hình;
+stop
+@enduml

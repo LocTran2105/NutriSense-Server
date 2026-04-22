@@ -1,0 +1,98 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor DarkBlue
+}
+
+package "hcmute.edu.vn.nitrisense.ui (Android)" {
+
+    class HistoryActivity {
+        - CURRENT_USER_ID: Long
+        - barChartContainer: LinearLayout
+        - currentDate: Calendar
+        + onCreate(Bundle)
+        - setupDatePicker()
+        - loadDashboardData(String)
+        - updateAverageCards(DashboardDTO)
+        - updateTargetProgress(DashboardDTO)
+        - drawBarChart(List<ChartItemDTO>)
+    }
+
+    interface ApiService {
+        + getDashboardData(Long, String): Call<DashboardDTO>
+    }
+
+    class DashboardDTO_App <<Model>> {
+        - avgCalories: int
+        - totalCalories: int
+        - targetCalories: int
+        - chartData: List<ChartItemDTO>
+        + getChartData()
+    }
+}
+
+package "hcmute.edu.vn.nitrisensebackend (Spring Boot)" {
+
+    class ReportController {
+        - dailySummaryRepository: DailySummaryRepository
+        - foodEntryItemRepository: FoodEntryItemRepository
+        - userRepository: UserRepository
+        + getDashboardData(Long, LocalDate): ResponseEntity<DashboardDTO>
+    }
+
+    class DailySummaryService {
+        - summaryRepo: DailySummaryRepository
+        + recalculateDailySummary(Long, LocalDate)
+    }
+
+    interface DailySummaryRepository {
+        + findByUserIdAndSummaryDateBetween(Long, LocalDate, LocalDate): List<DailySummary>
+    }
+
+    interface UserRepository {
+        + findById(Long): Optional<User>
+    }
+
+    class DashboardDTO_Server <<DTO>> {
+        - avgCalories: int
+        - totalCalories: int
+        - targetCalories: int
+        - chartData: List<ChartItemDTO>
+        + setChartData()
+    }
+
+    class DailySummary <<Entity>> {
+        - summaryId: Long
+        - userId: Long
+        - summaryDate: LocalDate
+        - totalCalories: Integer
+    }
+
+    class User <<Entity>> {
+        - dailyCalorieGoal: Integer
+        - waterGoalMl: Integer
+    }
+}
+
+' =================================
+' MỐI QUAN HỆ (RELATIONSHIPS)
+' =================================
+
+' Phía Android
+HistoryActivity ..> ApiService : calls
+HistoryActivity ..> DashboardDTO_App : renders
+
+' Phía Spring Boot
+ReportController --> DailySummaryRepository : injects
+ReportController --> UserRepository : injects
+ReportController ..> DashboardDTO_Server : builds
+
+DailySummaryService --> DailySummaryRepository : updates
+DailySummaryRepository ..> DailySummary : queries
+UserRepository ..> User : queries
+
+' Giao tiếp mạng
+ApiService -.> ReportController : REST API (GET)
+DashboardDTO_Server .left.> DashboardDTO_App : JSON Transfer
+@enduml

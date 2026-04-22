@@ -1,0 +1,80 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor DarkBlue
+}
+
+package "hcmute.edu.vn.nitrisense (Android)" {
+    class MainActivity {
+        - CURRENT_USER_ID: Long
+        - currentSummary: DailySummary
+        - loadDailySummary()
+        - updateUI()
+    }
+
+    interface ApiService {
+        + logMealBatch(MealBatchLogRequest): Call<ResponseBody>
+        + getDailySummary(Long, String): Call<DailySummary>
+        + getMealItems(Long, String, String): Call<List<FoodEntryItem>>
+    }
+
+    class MealBatchLogRequest <<DTO>> {
+        + userId: Long
+        + mealType: String
+        + date: String
+        + items: List<NutrientDto>
+    }
+
+    class NutrientDto <<DTO>> {
+        + foodName: String
+        + calories: Double
+        + proteinG: Double
+        + carbsG: Double
+        + fatG: Double
+    }
+}
+
+package "hcmute.edu.vn.nitrisensebackend (Spring Boot)" {
+    class MealController {
+        - mealService: MealService
+        + logBatch(MealBatchLogRequest): ResponseEntity
+        + getMealItems(Long, LocalDate, String): ResponseEntity
+    }
+
+    class MealService {
+        - foodEntryRepository: FoodEntryRepository
+        - foodEntryItemRepository: FoodEntryItemRepository
+        - dailySummaryService: DailySummaryService
+        + saveBatchMeals(Long, String, LocalDate, List<NutrientDto>, String)
+    }
+
+    class FoodEntry <<Entity>> {
+        - entryId: Long
+        - userId: Long
+        - entryDate: LocalDate
+        - mealType: String
+    }
+
+    class FoodEntryItem <<Entity>> {
+        - itemId: Long
+        - entryId: Long
+        - customName: String
+        - calories: BigDecimal
+        - proteinG: BigDecimal
+    }
+}
+
+' Mối quan hệ
+MainActivity ..> ApiService : calls
+MealBatchLogRequest "1" *-- "many" NutrientDto : contains
+ApiService ..> MealBatchLogRequest : sends
+
+MealController --> MealService : delegates
+MealService --> FoodEntry : creates/manages
+MealService --> FoodEntryItem : creates/manages
+FoodEntry "1" *-- "many" FoodEntryItem : parent-child relationship
+
+' Kết nối mạng
+ApiService -.> MealController : REST API (JSON)
+@enduml
