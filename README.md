@@ -17,7 +17,7 @@
 
 ## 🚀 Overview
 
-**NitriSense AI Backend** NitriSense AI là backend server cho ứng dụng theo dõi dinh dưỡng và trợ lý ảo thông minh. Hệ thống sử dụng Gemini API để phân tích món ăn từ văn bản tự nhiên và hình ảnh, trả về các chỉ số dinh dưỡng (calo, protein, vitamin, khoáng chất). Backend được xây dựng bằng Spring Boot, kết nối với MySQL, cung cấp RESTful API cho ứng dụng Android.
+**NitriSense AI Backend** cho ứng dụng theo dõi dinh dưỡng và trợ lý ảo thông minh. Hệ thống sử dụng Gemini API để phân tích món ăn từ văn bản tự nhiên và hình ảnh, trả về các chỉ số dinh dưỡng (calo, protein, vitamin, khoáng chất). Backend được xây dựng bằng Spring Boot, kết nối với MySQL, cung cấp RESTful API cho ứng dụng Android.
 
 💡 Điểm đặc biệt:
 - Phân tích món ăn bằng **AI (text + image)**
