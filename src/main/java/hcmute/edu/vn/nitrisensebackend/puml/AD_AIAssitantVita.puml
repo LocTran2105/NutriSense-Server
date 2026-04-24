@@ -1,0 +1,48 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Người dùng|
+start
+:Mở cửa sổ Chat\n(ChatBottomSheet);
+:Nhập tin nhắn văn bản\nhoặc dùng giọng nói;
+:Bấm nút Gửi;
+
+|Android (Client)|
+:Hiển thị bong bóng\n"Đang suy nghĩ...";
+:Đóng gói ChatSendRequest;
+:Gọi API POST /api/chat/send;
+
+|#LightYellow|Spring Boot (Server)|
+:ChatController tiếp nhận;
+:Kiểm tra dữ liệu rỗng;
+:ChatService lấy lịch sử chat\nvà thông tin thể trạng;
+:Tạo Prompt (System Instruction);
+
+|#LightPink|Gemini AI (API Ngoài)|
+:Nhận Prompt và Tin nhắn;
+:Xử lý ngôn ngữ tự nhiên (NLP);
+:Trả kết quả JSON (Text, Context);
+
+|#LightYellow|Spring Boot (Server)|
+:ChatService phân tích JSON;
+|#LightGreen|MySQL (Database)|
+:Lưu tin nhắn của USER;
+:Lưu tin nhắn của AI \nvào bảng `chat_messages`;
+
+|#LightYellow|Spring Boot (Server)|
+:Trả về đối tượng \nChatMessageResponseDTO;
+
+|Android (Client)|
+:Tắt bong bóng\n"Đang suy nghĩ...";
+:ChatAdapter cập nhật UI;
+|Người dùng|
+:Đọc câu trả lời của AI;
+stop
+@enduml

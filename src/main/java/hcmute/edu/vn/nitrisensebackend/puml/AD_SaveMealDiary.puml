@@ -1,0 +1,52 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Người dùng|
+start
+:Chọn loại bữa ăn (Sáng/Trưa/...);
+:Xác nhận danh sách món ăn;
+:Bấm "Lưu vào nhật ký";
+
+|Android (Frontend)|
+:Gom danh sách NutrientDto;
+:Đóng gói MealBatchLogRequest;
+:Gọi API POST /api/meals/log/batch;
+
+|#LightYellow|Spring Boot (Backend)|
+:MealController tiếp nhận Request;
+|#LightYellow|MealService (Logic)|
+:Bắt đầu giao dịch (@Transactional);
+if (Đã có FoodEntry cho ngày/loại này?) then (Chưa)
+  :Tạo mới FoodEntry (Bảng cha);
+else (Rồi)
+  :Lấy FoodEntry hiện có;
+endif
+
+' DÙNG VÒNG LẶP WHILE THAY CHO LOOP TRONG ACTIVITY DIAGRAM
+while (Còn món ăn trong danh sách?) is (Có)
+  :Tạo FoodEntryItem (Bảng con);
+  :Gán entryId của bảng cha vào;
+
+  |#LightGreen|MySQL (Database)|
+  :Thực thi lệnh \nINSERT INTO food_entry_items;
+
+  |#LightYellow|MealService (Logic)|
+  :Gọi DailySummaryService \nđể tính toán lại tổng kết ngày;
+endwhile (Hết)
+
+|#LightYellow|Spring Boot (Backend)|
+:Trả về thông báo thành công;
+
+|Android (Frontend)|
+:Hiển thị Toast "Thành công";
+:Quay về màn hình chính;
+:loadDailySummary() để cập nhật \nthanh ProgressBar;
+stop
+@enduml

@@ -1,0 +1,125 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor DarkBlue
+}
+
+' ==========================================
+' TẦNG ANDROID (CLIENT)
+' ==========================================
+package "hcmute.edu.vn.nitrisense.ui" {
+    class LoginActivity {
+        - etLoginEmail: EditText
+        - etLoginPassword: EditText
+        - mAuth: FirebaseAuth
+        - mGoogleSignInClient: GoogleSignInClient
+        + onCreate(Bundle)
+        - signInWithGoogle()
+        - firebaseAuthWithGoogle(String)
+        - syncWithBackend(String, String)
+        - showForgotPasswordDialog()
+    }
+
+    class RegisterActivity {
+        - etRegEmail: EditText
+        - etRegPassword: EditText
+        - etConfirmPassword: EditText
+        - mAuth: FirebaseAuth
+        + onCreate(Bundle)
+        - syncWithBackend(String, String)
+    }
+}
+
+package "hcmute.edu.vn.nitrisense.util" {
+    class SessionManager {
+        - {static} PREF_NAME: String = "NitriSenseSession"
+        - {static} KEY_USER_ID: String = "USER_ID"
+        + {static} saveUserId(Context, Long): void
+        + {static} getUserId(Context): Long
+        + {static} clearSession(Context): void
+    }
+}
+
+package "hcmute.edu.vn.nitrisense.model" {
+    class UserProfile {
+        - userId: Long
+        - email: String
+        - displayName: String
+        - heightCm: Double
+        - weightKg: Double
+        + getUserId(): Long
+        + setUserId(Long): void
+    }
+}
+
+package "hcmute.edu.vn.nitrisense.api" {
+    class RetrofitClient {
+        - {static} BASE_URL: String
+        - {static} retrofit: Retrofit
+        - {static} instance: RetrofitClient
+        + {static} getClient(): Retrofit
+        + {static} getInstance(): RetrofitClient
+        + getApi(): ApiService
+    }
+
+    interface ApiService {
+        + syncUser(UserSyncRequest): Call<UserProfile>
+    }
+
+    class UserSyncRequest {
+        + authUid: String
+        + email: String
+        + UserSyncRequest(String, String)
+    }
+}
+
+' ==========================================
+' TẦNG SPRING BOOT (SERVER)
+' ==========================================
+package "hcmute.edu.vn.nitrisensebackend" {
+    class UserController {
+        - userRepository: UserRepository
+        + syncUser(Map<String, String>): ResponseEntity<User>
+    }
+
+    interface UserRepository {
+        + findByAuthUid(String): Optional<User>
+        + findByEmail(String): Optional<User>
+    }
+
+    class User {
+        - userId: Long
+        - authUid: String
+        - email: String
+        - isDeleted: Boolean
+        + getUserId(): Long
+        + setAuthUid(String): void
+    }
+}
+
+' ==========================================
+' MỐI QUAN HỆ (RELATIONSHIPS)
+' ==========================================
+
+' Mối quan hệ giao diện UI
+LoginActivity ..> ApiService : calls
+RegisterActivity ..> ApiService : calls
+
+' Mối quan hệ với SessionManager
+LoginActivity ..> SessionManager : uses
+RegisterActivity ..> SessionManager : uses
+
+' Mối quan hệ API & Retrofit
+RetrofitClient --> ApiService : creates
+ApiService +-- UserSyncRequest : inner class (chứa bên trong)
+ApiService ..> UserProfile : returns (nhận JSON chuyển thành Object)
+
+' Mối quan hệ Backend
+UserController --> UserRepository : injects (@Autowired)
+UserRepository ..> User : manages
+UserController ..> User : returns
+
+' Mối quan hệ giao tiếp mạng (Internet)
+ApiService -.> UserController : REST API (JSON) qua mạng
+@enduml

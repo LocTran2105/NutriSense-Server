@@ -1,0 +1,53 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Người dùng|
+start
+:Mở màn hình Lịch sử\n(HistoryActivity);
+:Chọn một mốc ngày bất kỳ\n(Mặc định là ngày hôm nay);
+
+|Android (Frontend)|
+:Định dạng ngày (yyyy-MM-dd);
+:Gọi API GET /api/reports/dashboard;
+
+|#LightYellow|Spring Boot (Backend)|
+:ReportController tiếp nhận;
+:Tính toán mốc thời gian:\nstartDate = date - 6 ngày\nendDate = date;
+:Truy vấn DailySummaryRepository:\nLấy dữ liệu trong khoảng 7 ngày;
+:Truy vấn UserRepository:\nLấy mục tiêu (Target) của User;
+
+|#LightGreen|MySQL (Database)|
+:Thực thi lệnh SELECT BETWEEN;
+:Trả về danh sách DailySummary\nvà User Profile;
+
+|#LightYellow|Spring Boot (Backend)|
+:Tính toán vòng lặp (Aggregation):
+- Tổng & Trung bình Calo, Nước
+- Tổng & Trung bình Macro (Pro, Carb, Fat)
+- Tổng & Trung bình Micro (Vit C, Sắt...);
+:Đóng gói vào DashboardDTO \n(Kèm theo mảng ChartItemDTO);
+:Trả về HTTP 200 OK;
+
+|Android (Frontend)|
+:Nhận DashboardDTO;
+:Cập nhật các thẻ Trung bình (TextView);
+:Cập nhật các thanh Tiến độ (ProgressBar) \nso sánh Tổng vs Mục tiêu;
+
+' Xử lý vẽ biểu đồ động
+:Xóa dữ liệu biểu đồ cũ\n(barChartContainer.removeAllViews());
+while (Duyệt mảng ChartItemDTO 7 ngày) is (Còn)
+  :Tính toán chiều cao cột \ntỉ lệ với lượng Calo;
+  :Vẽ cột (View) và thêm vào giao diện;
+endwhile (Hết)
+
+|Người dùng|
+:Xem được biểu đồ cột \nvà các chỉ số dinh dưỡng;
+stop
+@enduml

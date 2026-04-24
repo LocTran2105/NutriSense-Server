@@ -1,0 +1,77 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor DarkBlue
+}
+
+package "hcmute.edu.vn.nitrisense.ui (Android)" {
+
+    class FitnessTestActivity {
+        - CURRENT_USER_ID: Long
+        + onCreate(Bundle)
+        - setupTestCards()
+        - showTestInputDialog(String, String, String)
+        - saveTestResult(ExerciseTest)
+        - loadRecentTests()
+    }
+
+    interface ApiService {
+        + logFitnessTest(ExerciseTest): Call<ExerciseTest>
+        + getRecentTests(Long): Call<List<ExerciseTest>>
+    }
+
+    class ExerciseTestDTO <<Model>> {
+        - testId: Long
+        - userId: Long
+        - testDate: String
+        - testType: String
+        - value: Double
+        - unit: String
+        - notes: String
+    }
+}
+
+package "hcmute.edu.vn.nitrisensebackend (Spring Boot)" {
+
+    class FitnessController {
+        - fitnessRepo: ExerciseTestRepository
+        + logFitnessTest(ExerciseTest): ResponseEntity<ExerciseTest>
+        + getRecentTests(Long): ResponseEntity<List<ExerciseTest>>
+    }
+
+    interface ExerciseTestRepository {
+        + findByUserIdAndTestTypeOrderByTestDateDesc(...)
+        + findTop10ByUserIdOrderByTestDateDescTestIdDesc(Long)
+    }
+
+    class ExerciseTestEntity <<Entity>> {
+        - testId: Long
+        - userId: Long
+        - testDate: LocalDate
+        - testType: String
+        - value: BigDecimal
+        - unit: String
+        - notes: String
+        - createdAt: LocalDateTime
+    }
+}
+
+' =================================
+' MỐI QUAN HỆ (RELATIONSHIPS)
+' =================================
+
+' Phía Android
+FitnessTestActivity ..> ApiService : calls
+FitnessTestActivity ..> ExerciseTestDTO : creates/manages
+ApiService ..> ExerciseTestDTO : uses
+
+' Phía Spring Boot
+FitnessController --> ExerciseTestRepository : injects (@Autowired)
+ExerciseTestRepository ..> ExerciseTestEntity : queries/manages
+FitnessController ..> ExerciseTestEntity : accepts/returns
+
+' Giao tiếp mạng (Network)
+ApiService -.> FitnessController : REST API (JSON)
+ExerciseTestDTO <.left.> ExerciseTestEntity : Map qua JSON (Double <-> BigDecimal)
+@enduml

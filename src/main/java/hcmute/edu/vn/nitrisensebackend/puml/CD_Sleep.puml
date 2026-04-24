@@ -1,0 +1,69 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor DarkBlue
+}
+
+package "hcmute.edu.vn.nitrisense.ui" {
+    class SleepActivity {
+        - isSoundActive: boolean[]
+        - btnPlayPause: MaterialButton
+        - timerReceiver: BroadcastReceiver
+        + onCreate(Bundle)
+        - toggleSound(int)
+        - sendCommandToService(String)
+        - onTimerFinished()
+        - updateRotationState()
+    }
+}
+
+package "hcmute.edu.vn.nitrisense.service" {
+    class SleepMusicService {
+        - mediaPlayers: MediaPlayer[]
+        - volumes: float[]
+        - countDownTimer: CountDownTimer
+        - notificationManager: NotificationManager
+        + onStartCommand(Intent, int, int): int
+        - startTimer(long)
+        - playTrack(int)
+        - stopTrack(int)
+        - createNotification(String): Notification
+        + onDestroy()
+    }
+}
+
+package "Android OS Framework" {
+    class Intent {
+        + action: String
+    }
+
+    class BroadcastReceiver {
+        + onReceive(Context, Intent)
+    }
+
+    class MediaPlayer {
+        + start()
+        + pause()
+        + setVolume(float, float)
+        + setLooping(boolean)
+    }
+
+    class CountDownTimer {
+        + onTick(long)
+        + onFinish()
+    }
+}
+
+' Mối quan hệ giữa Activity và Service
+SleepActivity ..> Intent : creates (Actions: START, PLAY, VOL)
+Intent --> SleepMusicService : delivers (via startService)
+
+SleepMusicService ..> Intent : creates (Action: UPDATE_TIMER)
+Intent --> BroadcastReceiver : delivers (via sendBroadcast)
+SleepActivity *-- BroadcastReceiver : registers
+
+' Mối quan hệ với Framework
+SleepMusicService *-- MediaPlayer : manages (up to 4)
+SleepMusicService *-- CountDownTimer : runs
+@enduml

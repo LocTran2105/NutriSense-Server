@@ -7,14 +7,6 @@ CREATE DATABASE IF NOT EXISTS nitrisense_db
 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- drop database nitrisense_db
 USE nitrisense_db;
--- INSERT INTO users (user_id, auth_uid, email, display_name) 
--- VALUES (1, 'mock_uid_123', 'test@gmail.com', 'Dev User');
--- DROP TRIGGER IF EXISTS after_food_entry_update;
--- DROP TRIGGER IF EXISTS after_food_entry_delete;
--- DROP TRIGGER IF EXISTS after_food_item_insert;
--- DROP TRIGGER IF EXISTS after_food_item_update;
--- DROP TRIGGER IF EXISTS after_food_item_delete;
--- DROP TRIGGER IF EXISTS trg_food_item_soft_delete;
 -- ============================================
 -- 1. users (có soft delete, audit)
 -- ============================================
@@ -45,54 +37,54 @@ CREATE TABLE users (
 -- ============================================
 -- 2. user_goals
 -- ============================================
-CREATE TABLE user_goals (
-    goal_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    goal_type ENUM('calorie', 'protein', 'carbs', 'fat', 'water', 'sleep_hours', 'steps') NOT NULL,
-    target_value DECIMAL(10,2) NOT NULL,
-    unit VARCHAR(20) NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE NULL,
-    is_deleted BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    INDEX idx_user_goal (user_id, goal_type, start_date)
-);
+-- CREATE TABLE user_goals (
+--     goal_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     user_id INT UNSIGNED NOT NULL,
+--     goal_type ENUM('calorie', 'protein', 'carbs', 'fat', 'water', 'sleep_hours', 'steps') NOT NULL,
+--     target_value DECIMAL(10,2) NOT NULL,
+--     unit VARCHAR(20) NOT NULL,
+--     start_date DATE NOT NULL,
+--     end_date DATE NULL,
+--     is_deleted BOOLEAN DEFAULT FALSE,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+--     INDEX idx_user_goal (user_id, goal_type, start_date)
+-- );
 
 -- ============================================
 -- 3. user_reminder_settings
 -- ============================================
-CREATE TABLE user_reminder_settings (
-    setting_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    reminder_type ENUM('water', 'meal', 'sleep', 'vitamin', 'exercise', 'general') NOT NULL,
-    enabled BOOLEAN DEFAULT TRUE,
-    start_time TIME NULL,
-    end_time TIME NULL,
-    interval_minutes INT UNSIGNED NULL,
-    specific_times JSON NULL,
-    message_template VARCHAR(255),
-    is_deleted BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
-);
+-- CREATE TABLE user_reminder_settings (
+--     setting_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     user_id INT UNSIGNED NOT NULL,
+--     reminder_type ENUM('water', 'meal', 'sleep', 'vitamin', 'exercise', 'general') NOT NULL,
+--     enabled BOOLEAN DEFAULT TRUE,
+--     start_time TIME NULL,
+--     end_time TIME NULL,
+--     interval_minutes INT UNSIGNED NULL,
+--     specific_times JSON NULL,
+--     message_template VARCHAR(255),
+--     is_deleted BOOLEAN DEFAULT FALSE,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+-- );
 
 -- ============================================
 -- 4. device_tokens
 -- ============================================
-CREATE TABLE device_tokens (
-    token_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    fcm_token VARCHAR(255) NOT NULL,
-    device_name VARCHAR(100),
-    last_used_at TIMESTAMP NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_token (user_id, fcm_token)
-);
+-- CREATE TABLE device_tokens (
+--     token_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     user_id INT UNSIGNED NOT NULL,
+--     fcm_token VARCHAR(255) NOT NULL,
+--     device_name VARCHAR(100),
+--     last_used_at TIMESTAMP NULL,
+--     is_active BOOLEAN DEFAULT TRUE,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+--     UNIQUE KEY unique_user_token (user_id, fcm_token)
+-- );
 
 -- ============================================
 -- 5. food_items (không dùng calories_per_100g nếu đơn vị không chuẩn)
@@ -222,19 +214,19 @@ CREATE TABLE nutrient_reference (
 -- ============================================
 -- 9. sleep_records (có CHECK constraint)
 -- ============================================
-CREATE TABLE sleep_records (
-    sleep_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    sleep_start DATETIME NOT NULL,
-    sleep_end DATETIME NOT NULL,
-    duration_hours DECIMAL(5,2) GENERATED ALWAYS AS (TIMESTAMPDIFF(MINUTE, sleep_start, sleep_end) / 60) STORED,
-    quality ENUM('good', 'fair', 'poor'),
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    INDEX idx_user_sleep (user_id, sleep_start),
-    CONSTRAINT chk_sleep_end_gt_start CHECK (sleep_end > sleep_start)
-);
+-- CREATE TABLE sleep_records (
+--     sleep_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     user_id INT UNSIGNED NOT NULL,
+--     sleep_start DATETIME NOT NULL,
+--     sleep_end DATETIME NOT NULL,
+--     duration_hours DECIMAL(5,2) GENERATED ALWAYS AS (TIMESTAMPDIFF(MINUTE, sleep_start, sleep_end) / 60) STORED,
+--     quality ENUM('good', 'fair', 'poor'),
+--     notes TEXT,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+--     INDEX idx_user_sleep (user_id, sleep_start),
+--     CONSTRAINT chk_sleep_end_gt_start CHECK (sleep_end > sleep_start)
+-- );
 
 -- ============================================
 -- 10. exercise_tests
@@ -293,7 +285,7 @@ CREATE TABLE nutrients (
     nutrient_name VARCHAR(50) NOT NULL UNIQUE,
     unit VARCHAR(20)
 );
-
+select * from nutrients;
 INSERT INTO nutrients (nutrient_name, unit) VALUES
 ('calories', 'kcal'),
 ('protein', 'g'),
@@ -309,49 +301,49 @@ INSERT INTO nutrients (nutrient_name, unit) VALUES
 -- ============================================
 -- 14. daily_deficits (dùng khóa ngoại tới nutrients)
 -- ============================================
-CREATE TABLE daily_deficits (
-    deficit_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    summary_id INT UNSIGNED NOT NULL,
-    nutrient_id TINYINT UNSIGNED NOT NULL,
-    deficit_amount DECIMAL(8,2),   -- mức thiếu hụt (có thể NULL nếu chỉ cần biết thiếu)
-    FOREIGN KEY (summary_id) REFERENCES daily_summaries(summary_id) ON DELETE CASCADE,
-    FOREIGN KEY (nutrient_id) REFERENCES nutrients(nutrient_id),
-    INDEX idx_summary (summary_id),
-    UNIQUE KEY unique_summary_nutrient (summary_id, nutrient_id)
-);
+-- CREATE TABLE daily_deficits (
+--     deficit_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     summary_id INT UNSIGNED NOT NULL,
+--     nutrient_id TINYINT UNSIGNED NOT NULL,
+--     deficit_amount DECIMAL(8,2),   -- mức thiếu hụt (có thể NULL nếu chỉ cần biết thiếu)
+--     FOREIGN KEY (summary_id) REFERENCES daily_summaries(summary_id) ON DELETE CASCADE,
+--     FOREIGN KEY (nutrient_id) REFERENCES nutrients(nutrient_id),
+--     INDEX idx_summary (summary_id),
+--     UNIQUE KEY unique_summary_nutrient (summary_id, nutrient_id)
+-- );
 -- ============================================
 -- 15. reports (thêm total_days, compliance_score)
 -- ============================================
-CREATE TABLE reports (
-    report_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    total_days TINYINT UNSIGNED NOT NULL,
-    compliance_score DECIMAL(5,2) DEFAULT 0,
-    avg_calories DECIMAL(8,2),
-    avg_water_ml DECIMAL(8,2),
-    summary_text TEXT NOT NULL,
-    recommendation TEXT,
-    chart_image_url TEXT,
-    shared_count TINYINT UNSIGNED DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    INDEX idx_user_report (user_id, start_date),
-    CONSTRAINT chk_total_days CHECK (total_days = DATEDIFF(end_date, start_date) + 1)
-);
-
+-- CREATE TABLE reports (
+--     report_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     user_id INT UNSIGNED NOT NULL,
+--     start_date DATE NOT NULL,
+--     end_date DATE NOT NULL,
+--     total_days TINYINT UNSIGNED NOT NULL,
+--     compliance_score DECIMAL(5,2) DEFAULT 0,
+--     avg_calories DECIMAL(8,2),
+--     avg_water_ml DECIMAL(8,2),
+--     summary_text TEXT NOT NULL,
+--     recommendation TEXT,
+--     chart_image_url TEXT,
+--     shared_count TINYINT UNSIGNED DEFAULT 0,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+--     INDEX idx_user_report (user_id, start_date),
+--     CONSTRAINT chk_total_days CHECK (total_days = DATEDIFF(end_date, start_date) + 1)
+-- );
+-- select * from reports;
 -- ============================================
 -- 16. share_logs
 -- ============================================
-CREATE TABLE share_logs (
-    share_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    report_id INT UNSIGNED NOT NULL,
-    shared_to_email VARCHAR(255) NOT NULL,
-    shared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (report_id) REFERENCES reports(report_id) ON DELETE CASCADE
-);
-
+-- CREATE TABLE share_logs (
+--     share_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     report_id INT UNSIGNED NOT NULL,
+--     shared_to_email VARCHAR(255) NOT NULL,
+--     shared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (report_id) REFERENCES reports(report_id) ON DELETE CASCADE
+-- );
+-- select * from share_logs;
 -- ============================================
 -- 17. schedules (soft delete)
 -- ============================================
@@ -365,31 +357,30 @@ CREATE TABLE schedules (
     end_time DATETIME,
     notes TEXT,
     is_user_modified BOOLEAN DEFAULT FALSE,
+    is_completed BOOLEAN DEFAULT FALSE,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_user_schedule (user_id, schedule_date)
 );
-ALTER TABLE schedules 
-ADD COLUMN is_completed BOOLEAN DEFAULT FALSE AFTER is_deleted;
 -- ============================================
 -- 18. schedule_templates
 -- ============================================
-CREATE TABLE schedule_templates (
-    template_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    day_of_week TINYINT UNSIGNED NOT NULL,
-    event_type ENUM('meal', 'exercise', 'study', 'rest', 'water_reminder', 'sleep') NOT NULL,
-    title VARCHAR(100),
-    start_time TIME NOT NULL,
-    end_time TIME,
-    notes TEXT,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    INDEX idx_user_template (user_id, day_of_week, is_active)
-);
+-- CREATE TABLE schedule_templates (
+--     template_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     user_id INT UNSIGNED NOT NULL,
+--     day_of_week TINYINT UNSIGNED NOT NULL,
+--     event_type ENUM('meal', 'exercise', 'study', 'rest', 'water_reminder', 'sleep') NOT NULL,
+--     title VARCHAR(100),
+--     start_time TIME NOT NULL,
+--     end_time TIME,
+--     notes TEXT,
+--     is_active BOOLEAN DEFAULT TRUE,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+--     INDEX idx_user_template (user_id, day_of_week, is_active)
+-- );
 
 -- ============================================
 -- 19. ai_processing_logs
@@ -427,55 +418,54 @@ CREATE TABLE scan_history (
 -- ============================================
 -- 21. favorite_foods
 -- ============================================
-CREATE TABLE favorite_foods (
-    user_id INT UNSIGNED NOT NULL,
-    food_id INT UNSIGNED NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, food_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (food_id) REFERENCES food_items(food_id) ON DELETE CASCADE
-);
+-- CREATE TABLE favorite_foods (
+--     user_id INT UNSIGNED NOT NULL,
+--     food_id INT UNSIGNED NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     PRIMARY KEY (user_id, food_id),
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+--     FOREIGN KEY (food_id) REFERENCES food_items(food_id) ON DELETE CASCADE
+-- );
 
 -- ============================================
 -- 22. streaks
 -- ============================================
-CREATE TABLE streaks (
-    streak_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED NOT NULL,
-    streak_type ENUM('login', 'water_goal', 'calorie_goal', 'sleep_goal', 'exercise') NOT NULL,
-    current_streak INT UNSIGNED DEFAULT 0,
-    longest_streak INT UNSIGNED DEFAULT 0,
-    last_updated_date DATE,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_streak (user_id, streak_type)
-);
+-- CREATE TABLE streaks (
+--     streak_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     user_id INT UNSIGNED NOT NULL,
+--     streak_type ENUM('login', 'water_goal', 'calorie_goal', 'sleep_goal', 'exercise') NOT NULL,
+--     current_streak INT UNSIGNED DEFAULT 0,
+--     longest_streak INT UNSIGNED DEFAULT 0,
+--     last_updated_date DATE,
+--     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+--     UNIQUE KEY unique_user_streak (user_id, streak_type)
+-- );
 
 -- ============================================
 -- 23. achievements
 -- ============================================
-CREATE TABLE achievements (
-    achievement_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    badge_icon_url TEXT,
-    requirement_type ENUM('days_streak', 'total_calories', 'total_water', 'exercise_count', 'meal_count'),
-    requirement_value INT UNSIGNED NOT NULL,
-    points INT UNSIGNED DEFAULT 0
-);
+-- CREATE TABLE achievements (
+--     achievement_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+--     name VARCHAR(100) NOT NULL,
+--     description TEXT,
+--     badge_icon_url TEXT,
+--     requirement_type ENUM('days_streak', 'total_calories', 'total_water', 'exercise_count', 'meal_count'),
+--     requirement_value INT UNSIGNED NOT NULL,
+--     points INT UNSIGNED DEFAULT 0
+-- );
 
 -- ============================================
 -- 24. user_achievements
 -- ============================================
-CREATE TABLE user_achievements (
-    user_id INT UNSIGNED NOT NULL,
-    achievement_id INT UNSIGNED NOT NULL,
-    achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, achievement_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (achievement_id) REFERENCES achievements(achievement_id) ON DELETE CASCADE
-);
-
+-- CREATE TABLE user_achievements (
+--     user_id INT UNSIGNED NOT NULL,
+--     achievement_id INT UNSIGNED NOT NULL,
+--     achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     PRIMARY KEY (user_id, achievement_id),
+--     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+--     FOREIGN KEY (achievement_id) REFERENCES achievements(achievement_id) ON DELETE CASCADE
+-- );
 -- ============================================
 -- 25. chat_messages
 -- Lưu lịch sử trò chuyện giữa user - AI - system
@@ -521,105 +511,6 @@ BEGIN
         num_meals = num_meals + 1;
 END$$
 
--- Trigger AFTER UPDATE trên food_entries: xử lý khi thay đổi ngày hoặc soft delete
-CREATE TRIGGER after_food_entry_update
-AFTER UPDATE ON food_entries
-FOR EACH ROW
-BEGIN
-    -- Nếu ngày thay đổi: giảm bữa cũ, tăng bữa mới
-    IF OLD.entry_date != NEW.entry_date AND OLD.is_deleted = FALSE AND NEW.is_deleted = FALSE THEN
-        UPDATE daily_summaries SET num_meals = num_meals - 1
-        WHERE user_id = OLD.user_id AND summary_date = OLD.entry_date;
-        INSERT INTO daily_summaries (user_id, summary_date, num_meals)
-        VALUES (NEW.user_id, NEW.entry_date, 1)
-        ON DUPLICATE KEY UPDATE num_meals = num_meals + 1;
-    END IF;
-    -- Nếu soft delete: giảm num_meals
-    IF OLD.is_deleted = FALSE AND NEW.is_deleted = TRUE THEN
-        UPDATE daily_summaries SET num_meals = num_meals - 1
-        WHERE user_id = OLD.user_id AND summary_date = OLD.entry_date;
-    END IF;
-    -- Nếu khôi phục: tăng num_meals
-    IF OLD.is_deleted = TRUE AND NEW.is_deleted = FALSE THEN
-        INSERT INTO daily_summaries (user_id, summary_date, num_meals)
-        VALUES (NEW.user_id, NEW.entry_date, 1)
-        ON DUPLICATE KEY UPDATE num_meals = num_meals + 1;
-    END IF;
-END$$
-
--- Trigger AFTER DELETE trên food_entries: giảm num_meals
-CREATE TRIGGER after_food_entry_delete
-AFTER DELETE ON food_entries
-FOR EACH ROW
-BEGIN
-    IF OLD.is_deleted = FALSE THEN
-        UPDATE daily_summaries SET num_meals = num_meals - 1
-        WHERE user_id = OLD.user_id AND summary_date = OLD.entry_date;
-    END IF;
-END$$
-
--- Trigger AFTER INSERT trên food_entry_items: cập nhật tổng dinh dưỡng
-CREATE TRIGGER after_food_item_insert
-AFTER INSERT ON food_entry_items
-FOR EACH ROW
-BEGIN
-    DECLARE v_user_id INT UNSIGNED;
-    DECLARE v_entry_date DATE;
-    SELECT user_id, entry_date INTO v_user_id, v_entry_date
-    FROM food_entries WHERE entry_id = NEW.entry_id AND is_deleted = FALSE;
-    
-    IF v_user_id IS NOT NULL THEN
-        INSERT INTO daily_summaries (user_id, summary_date, total_calories, total_protein_g, total_carbs_g, total_fat_g)
-        VALUES (v_user_id, v_entry_date, NEW.calories, NEW.protein_g, NEW.carbs_g, NEW.fat_g)
-        ON DUPLICATE KEY UPDATE
-            total_calories = total_calories + NEW.calories,
-            total_protein_g = total_protein_g + NEW.protein_g,
-            total_carbs_g = total_carbs_g + NEW.carbs_g,
-            total_fat_g = total_fat_g + NEW.fat_g;
-    END IF;
-END$$
-
--- Trigger AFTER UPDATE trên food_entry_items
-CREATE TRIGGER after_food_item_update
-AFTER UPDATE ON food_entry_items
-FOR EACH ROW
-BEGIN
-    DECLARE v_user_id INT UNSIGNED;
-    DECLARE v_entry_date DATE;
-    SELECT user_id, entry_date INTO v_user_id, v_entry_date
-    FROM food_entries WHERE entry_id = NEW.entry_id AND is_deleted = FALSE;
-    
-    IF v_user_id IS NOT NULL THEN
-        -- Trừ giá trị cũ, cộng giá trị mới
-        UPDATE daily_summaries
-        SET total_calories = total_calories - OLD.calories + NEW.calories,
-            total_protein_g = total_protein_g - OLD.protein_g + NEW.protein_g,
-            total_carbs_g = total_carbs_g - OLD.carbs_g + NEW.carbs_g,
-            total_fat_g = total_fat_g - OLD.fat_g + NEW.fat_g
-        WHERE user_id = v_user_id AND summary_date = v_entry_date;
-    END IF;
-END$$
-
--- Trigger AFTER DELETE trên food_entry_items
-CREATE TRIGGER after_food_item_delete
-AFTER DELETE ON food_entry_items
-FOR EACH ROW
-BEGIN
-    DECLARE v_user_id INT UNSIGNED;
-    DECLARE v_entry_date DATE;
-    SELECT user_id, entry_date INTO v_user_id, v_entry_date
-    FROM food_entries WHERE entry_id = OLD.entry_id AND is_deleted = FALSE;
-    
-    IF v_user_id IS NOT NULL THEN
-        UPDATE daily_summaries
-        SET total_calories = total_calories - OLD.calories,
-            total_protein_g = total_protein_g - OLD.protein_g,
-            total_carbs_g = total_carbs_g - OLD.carbs_g,
-            total_fat_g = total_fat_g - OLD.fat_g
-        WHERE user_id = v_user_id AND summary_date = v_entry_date;
-    END IF;
-END$$
-
 -- Trigger cho water_intake
 CREATE TRIGGER after_water_insert
 AFTER INSERT ON water_intake
@@ -648,42 +539,15 @@ BEGIN
     WHERE user_id = OLD.user_id AND summary_date = OLD.intake_date;
 END$$
 
--- Trigger cho sleep_records
-CREATE TRIGGER after_sleep_insert
-AFTER INSERT ON sleep_records
-FOR EACH ROW
-BEGIN
-    INSERT INTO daily_summaries (user_id, summary_date, sleep_hours)
-    VALUES (NEW.user_id, DATE(NEW.sleep_start), NEW.duration_hours)
-    ON DUPLICATE KEY UPDATE sleep_hours = NEW.duration_hours; -- chỉ lấy giấc ngủ chính (có thể cải tiến)
-END$$
-
-CREATE TRIGGER after_sleep_update
-AFTER UPDATE ON sleep_records
-FOR EACH ROW
-BEGIN
-    UPDATE daily_summaries
-    SET sleep_hours = NEW.duration_hours
-    WHERE user_id = NEW.user_id AND summary_date = DATE(NEW.sleep_start);
-END$$
-
-CREATE TRIGGER after_sleep_delete
-AFTER DELETE ON sleep_records
-FOR EACH ROW
-BEGIN
-    UPDATE daily_summaries
-    SET sleep_hours = 0
-    WHERE user_id = OLD.user_id AND summary_date = DATE(OLD.sleep_start);
-END$$
-
-DELIMITER ;
+-- Thêm một user mẫu có ID = 1 để thỏa mãn khóa ngoại
 
 -- ============================================
 -- Dữ liệu mẫu cho nutrient_reference
 -- ============================================
 INSERT INTO nutrient_reference (gender, activity_level, age_min, age_max, calories_kcal, protein_g, vitamin_c_mg, iron_mg, calcium_mg, water_ml) VALUES
 ('female', 'moderate', 19, 30, 2000, 46, 75, 18, 1000, 2700),
-('male', 'moderate', 19, 30, 2400, 56, 90, 8, 1000, 3000);\
+('male', 'moderate', 19, 30, 2400, 56, 90, 8, 1000, 3000);
+select * from nutrient_reference;
 
 -- Thêm các món giàu PROTEIN
 INSERT INTO food_items (name, calories, protein_g, carbs_g, fat_g, fiber_g, vitamin_a_mcg, vitamin_b12_mcg, vitamin_c_mg, vitamin_d_mcg, iron_mg, calcium_mg, potassium_mg, is_deleted, source, created_by, serving_size, serving_unit)
@@ -712,13 +576,3 @@ VALUES
 ('Thịt bò nạc', 250, 26.0, 0.0, 15.0, 0.0, 0, 2.6, 0, 0, 2.6, 18.0, 318.0, 0, 'user_manual', 1, 100, 'g'),
 ('Gan lợn (heo)', 165, 26.0, 3.8, 4.4, 0.0, 6500, 25.3, 25.3, 0, 18.0, 9.0, 273.0, 0, 'user_manual', 1, 100, 'g');
 
-
--- set sql_safe_updates = 1
--- delete from food_items wher
--- delete from food_entry_items
-select * from users;
-select * from daily_summaries;
-select * from food_entry_items;
-select * from user_goals;
-select * from exercise_tests;
-select * from chat_messages

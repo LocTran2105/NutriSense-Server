@@ -1,0 +1,49 @@
+@startuml
+skinparam activity {
+  BackgroundColor LightCyan
+  BorderColor DarkBlue
+}
+skinparam swimlane {
+  BorderColor Black
+  BorderThickness 2
+}
+
+|Người dùng|
+start
+:Mở tab Lịch trình;
+:Bấm nút dấu cộng (+);
+:Chọn giờ, loại sự kiện, \nnhập tên và bấm "Lưu";
+
+|Android (Client)|
+:Hàm saveScheduleToBackend() \nxử lý dữ liệu;
+fork
+  :Gọi AlarmHelper.scheduleExactAlarm();
+  :Thiết lập báo thức ngầm \n(AlarmManager) tại Local;
+fork again
+  :Khởi tạo đối tượng Schedule (DTO);
+  :Gọi API POST /api/schedules \n(qua Retrofit);
+end fork
+
+|#LightYellow|Spring Boot (Server)|
+:ScheduleController tiếp nhận \n(@PostMapping);
+:Kiểm tra và gán giá trị mặc định\n(isCompleted = false, isDeleted = false);
+
+|#LightGreen|MySQL (Database)|
+:Thực thi lệnh INSERT \nvào bảng `schedules`;
+
+|Spring Boot (Server)|
+:Trả về đối tượng Schedule \nđã lưu thành công (HTTP 200 OK);
+
+|Android (Client)|
+:Nhận Response (onResponse);
+if (Lưu thành công?) then (Có)
+  :Đóng Dialog;
+  :Gọi hàm getSchedulesFromBackend() \nđể tải lại danh sách;
+  |Người dùng|
+  :Nhìn thấy sự kiện mới \ntrên giao diện;
+else (Không)
+  |Android (Client)|
+  :Hiển thị Toast báo lỗi;
+endif
+stop
+@enduml

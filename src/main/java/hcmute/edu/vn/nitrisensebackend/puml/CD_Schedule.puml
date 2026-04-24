@@ -1,0 +1,91 @@
+@startuml
+skinparam class {
+    BackgroundColor White
+    ArrowColor Black
+    BorderColor DarkBlue
+}
+
+package "Android Client (hcmute.edu.vn.nitrisense)" {
+
+    class ScheduleActivity {
+        - selectedCalendar: Calendar
+        - CURRENT_USER_ID: Long
+        + onCreate(Bundle)
+        - getSchedulesFromBackend(String)
+        - saveScheduleToBackend(String, String, String, Dialog)
+        - toggleScheduleStatus(Schedule, boolean)
+    }
+
+    class AlarmHelper {
+        + {static} scheduleExactAlarm(Context, String, String)
+        + {static} cancelAlarm(Context, String)
+    }
+
+    class ReminderReceiver {
+        + onReceive(Context, Intent)
+        - getMessageByEventType(String): String
+    }
+
+    interface ApiService {
+        + getSchedulesByDate(Long, String): Call<List<Schedule>>
+        + createSchedule(Schedule): Call<Schedule>
+        + toggleScheduleCompletion(Long, boolean): Call<Schedule>
+    }
+
+    class ScheduleDTO <<Model>> {
+        - scheduleId: Long
+        - userId: Long
+        - scheduleDate: String
+        - startTime: String
+        - eventType: String
+        - isCompleted: Boolean
+        + getScheduleId()
+        + setCompleted(Boolean)
+    }
+}
+
+package "Spring Boot Server (hcmute.edu.vn.nitrisensebackend)" {
+
+    class ScheduleController {
+        - scheduleRepository: ScheduleRepository
+        + getSchedulesByDate(Long, LocalDate): ResponseEntity<List<Schedule>>
+        + createSchedule(Schedule): ResponseEntity<Schedule>
+        + toggleScheduleCompletion(Long, boolean): ResponseEntity<Schedule>
+    }
+
+    interface ScheduleRepository {
+        + findByUserIdAndScheduleDateAndIsDeletedFalseOrderByStartTimeAsc(Long, LocalDate): List<Schedule>
+    }
+
+    class ScheduleEntity <<Entity>> {
+        - scheduleId: Long
+        - userId: Long
+        - scheduleDate: LocalDate
+        - startTime: LocalDateTime
+        - eventType: String
+        - isCompleted: Boolean
+        - isDeleted: Boolean
+        + getScheduleId()
+        + setCompleted(Boolean)
+    }
+}
+
+' =================================
+' MỐI QUAN HỆ (RELATIONSHIPS)
+' =================================
+
+' Android internal
+ScheduleActivity ..> ApiService : calls
+ScheduleActivity ..> AlarmHelper : uses
+AlarmHelper ..> ReminderReceiver : triggers (via AlarmManager)
+ScheduleActivity ..> ScheduleDTO : manages list of
+
+' Spring Boot internal
+ScheduleController --> ScheduleRepository : injects (@Autowired)
+ScheduleRepository ..> ScheduleEntity : queries
+ScheduleController ..> ScheduleEntity : manipulates
+
+' Mạng (Network)
+ApiService -.> ScheduleController : REST API (JSON)
+ScheduleDTO <.left.> ScheduleEntity : Map qua JSON
+@enduml
