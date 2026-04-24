@@ -9,8 +9,6 @@ public class MealBatchLogRequest {
     private LocalDate date;
     private List<NutrientDto> items;
     private String imageUrls;
-
-    // Getters and Setters
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
 

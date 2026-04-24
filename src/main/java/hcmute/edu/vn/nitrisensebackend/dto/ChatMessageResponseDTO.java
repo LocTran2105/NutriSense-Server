@@ -14,7 +14,6 @@ public class ChatMessageResponseDTO {
     private LocalDateTime readAt;
     private LocalDateTime createdAt;
 
-    // --- Getters and Setters ---
 
     public Long getId() {
         return id;

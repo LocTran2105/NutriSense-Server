@@ -24,7 +24,6 @@ public class Schedule {
     @Column(name = "is_completed")
     private Boolean isCompleted = false;
 
-    // Kéo xuống dưới cùng tạo luôn Getter/Setter:
     public Boolean getCompleted() {
         return isCompleted;
     }

@@ -37,7 +37,6 @@ public class ChatController {
 
     @PostMapping("/send")
     public ResponseEntity<?> send(@RequestBody ChatSendRequest request) {
-        // CHẶN SPAM & LỖI DATA
         if (request.getUserId() == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Thiếu thông tin định danh người dùng."));
         }
@@ -48,10 +47,8 @@ public class ChatController {
         try {
             return ResponseEntity.ok(chatService.processUserMessage(request.getUserId(), request.getMessage()));
         } catch (Exception e) {
-            // Log lỗi ở server để trace bug
             System.err.println("[ChatController] User: " + request.getUserId() + " | Exception: " + e.getMessage());
 
-            // Trả về câu thông báo thân thiện cho người dùng, giấu e.getMessage()
             return ResponseEntity.internalServerError().body(Map.of("error", "Hệ thống AI đang bận hoặc gặp sự cố. Vui lòng thử lại sau."));
         }
     }

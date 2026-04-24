@@ -3,7 +3,7 @@ package hcmute.edu.vn.nitrisensebackend.dto;
 import java.util.List;
 
 public class DashboardDTO {
-    // --- CÁC BIẾN CŨ GIỮ LẠI ---
+
     private int avgCalories;
     private double avgWaterLiters;
     private double avgProtein;
@@ -14,7 +14,6 @@ public class DashboardDTO {
     private double avgIron;
     private double avgCalcium;
 
-    // --- CÁC BIẾN MỚI: TỔNG VÀ MỤC TIÊU 7 NGÀY ---
     private int totalCalories;
     private int targetCalories;
     private double totalWaterLiters;
@@ -46,7 +45,6 @@ public class DashboardDTO {
         public void setCalories(int calories) { this.calories = calories; }
     }
 
-    // --- GETTER & SETTER CŨ ---
     public int getAvgCalories() { return avgCalories; }
     public void setAvgCalories(int avgCalories) { this.avgCalories = avgCalories; }
     public double getAvgWaterLiters() { return avgWaterLiters; }
@@ -67,8 +65,6 @@ public class DashboardDTO {
     public void setAvgCalcium(double avgCalcium) { this.avgCalcium = avgCalcium; }
     public List<ChartItemDTO> getChartData() { return chartData; }
     public void setChartData(List<ChartItemDTO> chartData) { this.chartData = chartData; }
-
-    // --- GETTER & SETTER MỚI ---
     public int getTotalCalories() { return totalCalories; }
     public void setTotalCalories(int totalCalories) { this.totalCalories = totalCalories; }
     public int getTargetCalories() { return targetCalories; }

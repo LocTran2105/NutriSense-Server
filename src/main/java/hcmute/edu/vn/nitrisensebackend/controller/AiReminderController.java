@@ -32,10 +32,8 @@ public class AiReminderController {
         DailySummary summary = dailySummaryService.getSummaryByDate(userId, LocalDate.now());
         List<FoodEntryItem> todayItems = mealService.getMealItemsForWholeDay(userId, LocalDate.now());
 
-        // LẤY MỤC TIÊU TỪ USER PROFILE
         User profile = userRepository.findById(userId).orElse(null);
 
-        // Đổi logic trong AiService để nhận UserProfile thay vì List<UserGoal>
         ReminderResponseDto response = aiService.generateDailyReminder(userId, profile, todayItems, summary);
 
         return ResponseEntity.ok(response);

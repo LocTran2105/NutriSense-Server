@@ -10,7 +10,6 @@ import java.util.Optional;
 
 @Repository
 public interface NutrientReferenceRepository extends JpaRepository<NutrientReference, Long> {
-    // Tìm RDA phù hợp với giới tính, độ tuổi và mức độ vận động
     Optional<NutrientReference> findByGenderAndActivityLevelAndAgeMinLessThanEqualAndAgeMaxGreaterThanEqual(
             String gender, String activityLevel, Integer age, Integer sameAge);
 }

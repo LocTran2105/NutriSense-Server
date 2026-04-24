@@ -11,13 +11,13 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/schedules") // Bắt buộc phải có dòng này để khớp với đường dẫn bên Android
+@RequestMapping("/api/schedules")
 public class ScheduleController {
 
     @Autowired
     private ScheduleRepository scheduleRepository;
 
-    // 1. API Lấy danh sách lịch trình theo ngày (Khớp với @GET)
+
     @GetMapping
     public ResponseEntity<List<Schedule>> getSchedulesByDate(
             @RequestParam Long userId,
@@ -27,10 +27,9 @@ public class ScheduleController {
         return ResponseEntity.ok(schedules);
     }
 
-    // 2. API Tạo sự kiện mới (Khớp với @POST - Sửa lỗi 404 khi Lưu)
+
     @PostMapping
     public ResponseEntity<Schedule> createSchedule(@RequestBody Schedule schedule) {
-        // Đảm bảo các giá trị mặc định không bị null
         if (schedule.getCompleted() == null) {
             schedule.setCompleted(false);
         }
@@ -41,7 +40,6 @@ public class ScheduleController {
         return ResponseEntity.ok(savedSchedule);
     }
 
-    // 3. API Đánh dấu hoàn thành (Khớp với @PATCH - Sửa lỗi 404 khi Tick Checkbox)
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<Schedule> toggleScheduleCompletion(
             @PathVariable("id") Long id,

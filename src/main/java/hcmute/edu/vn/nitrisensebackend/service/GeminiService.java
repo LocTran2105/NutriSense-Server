@@ -15,10 +15,8 @@ public class GeminiService {
     @Value("${gemini.api.url}") private String apiUrl;
     @Value("${gemini.api.key}") private String apiKey;
 
-    // THÊM KEY DỰ PHÒNG TỪ APPLICATION.PROPERTIES
     @Value("${gemini.api.key.fallback}") private String fallbackKey;
 
-    // Inject từ Spring Boot
     private final ObjectMapper mapper;
     private final RestTemplate restTemplate;
 
@@ -27,17 +25,13 @@ public class GeminiService {
         this.restTemplate = restTemplate;
     }
 
-    // THÊM THAM SỐ useFallback ĐỂ CHATSERVICE GỌI ĐỔI KEY
     public String generateChatResponse(String systemInstruction, String userText, boolean useFallback) throws Exception {
-        // Lựa chọn Key dựa vào tình trạng lỗi
         String currentKey = useFallback ? fallbackKey : apiKey;
 
-        // BẮT BUỘC DÙNG IN HOA CHO TYPE THEO CHUẨN GOOGLE API GEMINI 2.5
         Map<String, Object> responseSchema = new LinkedHashMap<>();
         responseSchema.put("type", "OBJECT");
 
         Map<String, Object> schemaProps = new LinkedHashMap<>();
-        // Đã cập nhật đầy đủ các loại Enum theo chuẩn DB và chuyển type thành IN HOA
         schemaProps.put("message_type", Map.of(
                 "type", "STRING",
                 "description", "Chỉ chọn: CHAT, FOLLOWUP, REMINDER, WARNING, ACHIEVEMENT, SYSTEM_NOTICE"
@@ -60,14 +54,12 @@ public class GeminiService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // Gửi request với currentKey đã được chọn
         ResponseEntity<String> response = restTemplate.exchange(
                 apiUrl + "?key=" + currentKey, HttpMethod.POST, new HttpEntity<>(requestBody, headers), String.class);
 
         JsonNode root = mapper.readTree(response.getBody());
         JsonNode candidates = root.path("candidates");
 
-        // Bảo vệ chống NullPointer khi API trả sai cấu trúc
         if (candidates.isMissingNode() || candidates.isEmpty()) {
             throw new RuntimeException("Gemini từ chối phản hồi hoặc block an toàn.");
         }

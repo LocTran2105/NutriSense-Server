@@ -28,14 +28,11 @@ public class MealController {
     @Autowired private MealService mealService;
     @Autowired private AiService aiService;
 
-    // LỚP KHIÊN BẢO VỆ: BỘ NHỚ TẠM CHỐNG SPAM CLICK (Debounce Cache)
     private final ConcurrentHashMap<String, Long> requestCache = new ConcurrentHashMap<>();
 
-    // 1. API CŨ: DÀNH CHO NHẬP TEXT (ĐÃ NÂNG CẤP CHỐNG SPAM & LƯU NHIỀU MÓN)
     @PostMapping("/log")
     public ResponseEntity<?> logMealFromAi(@RequestBody MealLogRequest request) {
 
-        // --- BẮT ĐẦU CHỐNG SPAM (Chặn 5 giây) ---
         String cacheKey = request.getUserId() + "_" + request.getUserInput();
         long now = System.currentTimeMillis();
 
@@ -44,9 +41,7 @@ public class MealController {
             err.put("error", "Bạn thao tác quá nhanh, vui lòng đợi 5 giây!");
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(err);
         }
-        // Cập nhật thời gian gửi mới nhất
         requestCache.put(cacheKey, now);
-        // --- KẾT THÚC CHỐNG SPAM ---
 
         try {
             AiAnalyzeResult aiResult = aiService.analyzeFood(request.getUserId(), request.getUserInput());
@@ -74,9 +69,7 @@ public class MealController {
                 }
             }
 
-            // ĐÃ FIX LỖI PARSE JSON CHO ANDROID
             if (!savedItems.isEmpty()) {
-                // Chỉ trả về phần tử đầu tiên để Retrofit của Android không bị lỗi
                 return ResponseEntity.ok(savedItems.get(0));
             } else {
                 return ResponseEntity.badRequest().body(Map.of("error", "Không lưu được món ăn nào"));
@@ -93,7 +86,6 @@ public class MealController {
         }
     }
 
-    // 2. API MỚI: DÀNH CHO LUỒNG HÌNH ẢNH
     @PostMapping("/log/batch")
     public ResponseEntity<?> logMealBatch(@RequestBody MealBatchLogRequest request) {
         try {

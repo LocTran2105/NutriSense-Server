@@ -47,7 +47,6 @@ public class DailySummary {
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
-    // --- CÁC HÀM CONSTRUCTOR ---
     public DailySummary() {}
 
     public DailySummary(Long userId, LocalDate summaryDate) {
@@ -55,7 +54,6 @@ public class DailySummary {
         this.summaryDate = summaryDate;
     }
 
-    // --- GETTERS & SETTERS ---
 
     public Long getSummaryId() { return summaryId; }
     public void setSummaryId(Long summaryId) { this.summaryId = summaryId; }

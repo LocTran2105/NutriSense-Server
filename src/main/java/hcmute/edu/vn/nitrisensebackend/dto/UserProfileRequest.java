@@ -1,11 +1,11 @@
 package hcmute.edu.vn.nitrisensebackend.dto;
 
 public class UserProfileRequest {
-    private Integer age; // Tuổi (Để backend tự tính ra năm sinh)
+    private Integer age;
     private Double heightCm;
     private Double weightKg;
-    private String gender; // 'male', 'female'
-    private String activityLevel; // 'sedentary', 'light', 'moderate', 'active', 'very_active'
+    private String gender;
+    private String activityLevel;
     private Integer dailyCalorieGoal;
 
     public Integer getWaterGoalMl() {

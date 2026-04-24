@@ -24,14 +24,12 @@ public class MealService {
     @Autowired private FoodEntryRepository foodEntryRepository;
     @Autowired private FoodEntryItemRepository foodEntryItemRepository;
 
-    // TIÊM TRUNG TÂM TÍNH TOÁN
     @Autowired private DailySummaryService dailySummaryService;
 
-    // 1. LƯU 1 MÓN (DÙNG CHO TEXT HOẶC NHẬP TAY)
     @Transactional
     public FoodEntryItem saveMealData(Long userId, String mealType, String userInput, FoodItem foodItem, String source, String imageUrls) {
 
-        foodItem.setDeleted(false); // THÊM DÒNG NÀY
+        foodItem.setDeleted(false);
         foodItem = foodItemRepository.save(foodItem);
 
         LocalDate today = LocalDate.now();
@@ -44,7 +42,7 @@ public class MealService {
             newEntry.setMealType(mealType);
             newEntry.setCreatedBy(userId);
 
-            newEntry.setDeleted(false); // THÊM DÒNG NÀY QUAN TRỌNG NHẤT
+            newEntry.setDeleted(false);
 
             return foodEntryRepository.save(newEntry);
         });
@@ -74,7 +72,7 @@ public class MealService {
             entryItem.setImageUrls(imageUrls);
         }
 
-        entryItem.setDeleted(false); // THÊM DÒNG NÀY
+        entryItem.setDeleted(false);
 
         FoodEntryItem savedItem = foodEntryItemRepository.save(entryItem);
 
@@ -82,7 +80,7 @@ public class MealService {
         return savedItem;
     }
 
-    // 2. LƯU HÀNG LOẠT MÓN TỪ ẢNH (BẬT TRANSACTION BẢO VỆ)
+
         @Transactional(rollbackOn = Exception.class)
         public void saveMealFromAi(Long userId, String mealType, LocalDate date, List<NutrientDto> confirmedItems, String imageUrls) {
 
@@ -94,7 +92,7 @@ public class MealService {
                         newEntry.setMealType(mealType);
                         newEntry.setCreatedBy(userId);
 
-                        newEntry.setDeleted(false); // THÊM DÒNG NÀY
+                        newEntry.setDeleted(false);
 
                         return foodEntryRepository.save(newEntry);
                     });
@@ -123,7 +121,7 @@ public class MealService {
                 foodItem.setSource("gemini_ai");
                 foodItem.setCreatedBy(userId);
 
-                foodItem.setDeleted(false); // THÊM DÒNG NÀY
+                foodItem.setDeleted(false);
 
                 foodItem = foodItemRepository.save(foodItem);
 
@@ -135,7 +133,7 @@ public class MealService {
                     entryItem.setRawInput(dto.getRawInput());
                     entryItem.setCustomName(dto.getRawInput());
                 } else {
-                    // Đề phòng Android không gửi rawInput, ta lấy luôn tên foodName
+
                     entryItem.setRawInput(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
                     entryItem.setCustomName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
                 }
@@ -157,7 +155,7 @@ public class MealService {
                     entryItem.setImageUrls(imageUrls);
                 }
 
-                entryItem.setDeleted(false); // THÊM DÒNG NÀY
+                entryItem.setDeleted(false);
 
                 itemsToSave.add(entryItem);
             }
@@ -192,7 +190,7 @@ public class MealService {
                 foodEntryItemRepository.save(item);
             }
 
-            // CẬP NHẬT TỔNG KẾT NGÀY
+
             dailySummaryService.recalculateDailySummary(userId, date);
         }
     }
@@ -205,7 +203,7 @@ public class MealService {
             item.setDeleted(true);
             foodEntryItemRepository.save(item);
 
-            // Tìm ngày của món ăn để cập nhật
+
             foodEntryRepository.findById(item.getEntryId()).ifPresent(entry -> {
                 dailySummaryService.recalculateDailySummary(entry.getUserId(), entry.getEntryDate());
             });
@@ -215,20 +213,14 @@ public class MealService {
     private BigDecimal safe(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
     }
-    // ==========================================================
-    // LẤY TẤT CẢ MÓN ĂN TRONG NGÀY (SẠCH - KHÔNG BỊ XÓA MỀM)
-    // ==========================================================
+
     public List<FoodEntryItem> getMealItemsForWholeDay(Long userId, LocalDate date) {
         List<FoodEntryItem> allItemsToday = new ArrayList<>();
 
-        // Lấy tất cả các bữa ăn (Sáng, Trưa, Tối, Phụ...) chưa bị xóa
-        // LƯU Ý: Bạn cần mở file FoodEntryRepository.java và thêm dòng này vào interface:
-        // List<FoodEntry> findByUserIdAndEntryDateAndIsDeletedFalse(Long userId, LocalDate date);
         List<FoodEntry> validEntries = foodEntryRepository.findByUserIdAndEntryDateAndIsDeletedFalse(userId, date);
 
         if (validEntries != null) {
             for (FoodEntry entry : validEntries) {
-                // Chỉ lấy món ăn chưa bị xóa bên trong bữa ăn hợp lệ
                 allItemsToday.addAll(foodEntryItemRepository.findByEntryIdAndIsDeletedFalse(entry.getEntryId()));
             }
         }

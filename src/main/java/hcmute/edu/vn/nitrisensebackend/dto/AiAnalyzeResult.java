@@ -9,10 +9,8 @@ public class AiAnalyzeResult {
     private boolean askUser;
     private String question;
     private List<FoodItem> foodItems;
-    // Constructor rỗng
     public AiAnalyzeResult() {}
 
-    // --- Getters & Setters ---
 
     public boolean isAskUser() {
         return askUser;

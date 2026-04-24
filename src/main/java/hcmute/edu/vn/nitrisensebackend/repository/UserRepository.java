@@ -10,7 +10,6 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-    // Tìm user theo UID của Firebase
     Optional<User> findByAuthUid(String authUid);
     Optional<User> findByEmail(String email);
 }

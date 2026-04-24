@@ -13,7 +13,6 @@ public class WaterController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    // API POST để thêm nước trực tiếp vào bảng water_intake
     @PostMapping("/add")
     public ResponseEntity<?> addWater(@RequestParam Long userId, @RequestParam int amountMl) {
         String sql = "INSERT INTO water_intake (user_id, intake_date, amount_ml, source) VALUES (?, ?, ?, 'manual')";

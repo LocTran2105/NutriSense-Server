@@ -17,14 +17,12 @@ public class NutrientSumDto {
     private BigDecimal calciumMg;
     private BigDecimal potassiumMg;
 
-    // Constructor được JPA gọi khi dùng từ khóa "new" trong câu lệnh @Query
     public NutrientSumDto(
             BigDecimal calories, BigDecimal proteinG, BigDecimal carbsG, BigDecimal fatG,
             BigDecimal fiberG, BigDecimal vitaminAMcg, BigDecimal vitaminB12Mcg,
             BigDecimal vitaminCMg, BigDecimal vitaminDMcg, BigDecimal ironMg,
             BigDecimal calciumMg, BigDecimal potassiumMg) {
 
-        // Chặn lỗi NULL an toàn tuyệt đối
         this.calories = calories != null ? calories : BigDecimal.ZERO;
         this.proteinG = proteinG != null ? proteinG : BigDecimal.ZERO;
         this.carbsG = carbsG != null ? carbsG : BigDecimal.ZERO;
@@ -39,7 +37,6 @@ public class NutrientSumDto {
         this.potassiumMg = potassiumMg != null ? potassiumMg : BigDecimal.ZERO;
     }
 
-    // --- GETTERS ---
     public BigDecimal getCalories() { return calories; }
     public BigDecimal getProteinG() { return proteinG; }
     public BigDecimal getCarbsG() { return carbsG; }

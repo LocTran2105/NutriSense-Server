@@ -10,11 +10,8 @@ import java.util.Optional;
 
 @Repository
 public interface DailySummaryRepository extends JpaRepository<DailySummary, Long> {
-    // Rất quan trọng: Lấy tổng kết ngày hôm nay để vẽ biểu đồ
     Optional<DailySummary> findByUserIdAndSummaryDate(Long userId, LocalDate summaryDate);
 
-
-    // Lấy dữ liệu 7-10 ngày qua
     List<DailySummary> findByUserIdAndSummaryDateBetweenOrderBySummaryDateAsc(
             Long userId, LocalDate startDate, LocalDate endDate);
 }

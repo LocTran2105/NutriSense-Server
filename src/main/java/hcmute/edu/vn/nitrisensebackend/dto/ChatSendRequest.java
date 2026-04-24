@@ -4,7 +4,6 @@ public class ChatSendRequest {
     private Long userId;
     private String message;
 
-    // --- Getters and Setters ---
     public Long getUserId() {
         return userId;
     }

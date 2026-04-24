@@ -27,13 +27,11 @@ public class HomeController {
     public ResponseEntity<?> getDailySummary(@RequestParam Long userId) {
         LocalDate today = LocalDate.now();
 
-        // Tìm dòng tổng kết của ngày hôm nay trong bảng daily_summaries
         Optional<DailySummary> summary = dailySummaryRepository.findByUserIdAndSummaryDate(userId, today);
 
         if (summary.isPresent()) {
             return ResponseEntity.ok(summary.get());
         } else {
-            // Nếu người dùng chưa ăn gì hôm nay, trả về một đối tượng rỗng với các chỉ số bằng 0
             DailySummary emptySummary = new DailySummary();
             emptySummary.setUserId(userId);
             emptySummary.setSummaryDate(today);

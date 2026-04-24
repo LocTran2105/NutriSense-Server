@@ -15,7 +15,6 @@ public interface FoodEntryItemRepository extends JpaRepository<FoodEntryItem, Lo
 
     List<FoodEntryItem> findByEntryIdAndIsDeletedFalse(Long entryId);
 
-    // Dành cho hiển thị báo cáo hoặc lịch sử
     @Query(value = "SELECT i.* FROM food_entry_items i " +
             "INNER JOIN food_entries e ON i.entry_id = e.entry_id " +
             "WHERE e.user_id = :userId " +
@@ -27,7 +26,6 @@ public interface FoodEntryItemRepository extends JpaRepository<FoodEntryItem, Lo
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
-    // VŨ KHÍ TỐI THƯỢNG 2: Ép MySQL tính tổng dinh dưỡng cực nhanh
     @Query("SELECT new hcmute.edu.vn.nitrisensebackend.dto.NutrientSumDto(" +
             "SUM(i.calories), SUM(i.proteinG), SUM(i.carbsG), SUM(i.fatG), " +
             "SUM(i.fiberG), SUM(i.vitaminAMcg), SUM(i.vitaminB12Mcg), SUM(i.vitaminCMg), " +

@@ -6,8 +6,7 @@ import hcmute.edu.vn.nitrisensebackend.enums.ChatSender;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-import org.hibernate.annotations.Type; // IMPORT THƯ VIỆN MỚI
-// THÊM 2 IMPORT NÀY CỦA HIBERNATE 6
+import org.hibernate.annotations.Type;
 import org.hibernate.annotations.JdbcTypeCode;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -52,7 +51,6 @@ public class ChatMessage {
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
-    // --- Getters and Setters ---
 
     public Long getMessageId() { return messageId; }
     public void setMessageId(Long messageId) { this.messageId = messageId; }

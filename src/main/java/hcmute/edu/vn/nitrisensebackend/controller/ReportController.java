@@ -30,7 +30,7 @@ public class ReportController {
     private FoodEntryItemRepository foodEntryItemRepository;
 
     @Autowired
-    private UserRepository userRepository; // Thêm repo này để lấy Profile
+    private UserRepository userRepository;
 
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardDTO> getDashboardReport(
@@ -38,7 +38,6 @@ public class ReportController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-        // 1. TÍNH CALO VÀ MACRO TỪ SUMMARY
         List<DailySummary> summaries = dailySummaryRepository.findByUserIdAndSummaryDateBetweenOrderBySummaryDateAsc(userId, startDate, endDate);
         Map<LocalDate, DailySummary> map = summaries.stream()
                 .collect(Collectors.toMap(DailySummary::getSummaryDate, s -> s));
@@ -69,7 +68,6 @@ public class ReportController {
             current = current.plusDays(1);
         }
 
-        // 2. TÍNH VI CHẤT TỪ FOOD ENTRY ITEMS
         List<FoodEntryItem> allItems = foodEntryItemRepository.findAllItemsByUserIdAndDateRange(userId, startDate, endDate);
         double totalFiber = 0.0, totalVitC = 0.0, totalIron = 0.0, totalCalcium = 0.0;
 
@@ -80,9 +78,8 @@ public class ReportController {
             totalCalcium += item.getCalciumMg() != null ? item.getCalciumMg().doubleValue() : 0.0;
         }
 
-        long totalDays = ChronoUnit.DAYS.between(startDate, endDate) + 1; // Luôn chia cho 7
+        long totalDays = ChronoUnit.DAYS.between(startDate, endDate) + 1;
 
-        // 3. LẤY MỤC TIÊU CỦA USER VÀ NHÂN LÊN THEO SỐ NGÀY
         User user = userRepository.findById(userId).orElse(null);
         int dailyTargetCal = (user != null && user.getDailyCalorieGoal() != null) ? user.getDailyCalorieGoal() : 2000;
         int dailyTargetWater = (user != null && user.getWaterGoalMl() != null) ? user.getWaterGoalMl() : 2000;
@@ -93,7 +90,6 @@ public class ReportController {
 
         DashboardDTO dto = new DashboardDTO();
 
-        // --- Dữ liệu trung bình (Giữ lại để tương thích ngược) ---
         dto.setAvgCalories((int) (totalCal / totalDays));
         dto.setAvgWaterLiters((totalWater / (double) totalDays) / 1000.0);
         dto.setAvgProtein(totalPro / totalDays);
@@ -104,7 +100,6 @@ public class ReportController {
         dto.setAvgIron(totalIron / totalDays);
         dto.setAvgCalcium(totalCalcium / totalDays);
 
-        // --- GÁN DỮ LIỆU TỔNG VÀ MỤC TIÊU 7 NGÀY ---
         dto.setTotalCalories(totalCal);
         dto.setTargetCalories((int)(dailyTargetCal * totalDays));
 
@@ -121,16 +116,16 @@ public class ReportController {
         dto.setTargetFat(dailyTargetFat * totalDays);
 
         dto.setTotalFiber(totalFiber);
-        dto.setTargetFiber(28.0 * totalDays); // Ngưỡng mặc định 28g xơ/ngày
+        dto.setTargetFiber(28.0 * totalDays);
 
         dto.setTotalVitaminC(totalVitC);
-        dto.setTargetVitaminC(90.0 * totalDays); // 90mg/ngày
+        dto.setTargetVitaminC(90.0 * totalDays);
 
         dto.setTotalIron(totalIron);
-        dto.setTargetIron(18.0 * totalDays); // 18mg/ngày
+        dto.setTargetIron(18.0 * totalDays);
 
         dto.setTotalCalcium(totalCalcium);
-        dto.setTargetCalcium(1000.0 * totalDays); // 1000mg/ngày
+        dto.setTargetCalcium(1000.0 * totalDays);
 
         dto.setChartData(chartData);
 

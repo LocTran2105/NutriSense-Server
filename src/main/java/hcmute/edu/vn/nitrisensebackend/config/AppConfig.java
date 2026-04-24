@@ -12,10 +12,8 @@ public class AppConfig {
         org.springframework.http.client.SimpleClientHttpRequestFactory factory =
                 new org.springframework.http.client.SimpleClientHttpRequestFactory();
 
-        // Thời gian tối đa để kết nối mạng: 5000 mili-giây (5 giây)
         factory.setConnectTimeout(5000);
 
-        // Thời gian tối đa đợi AI suy nghĩ trả lời: 15000 mili-giây (15 giây)
         factory.setReadTimeout(15000);
 
         return new RestTemplate(factory);

@@ -17,12 +17,10 @@ public interface FoodEntryRepository extends JpaRepository<FoodEntry, Long> {
 
     Optional<FoodEntry> findByUserIdAndEntryDateAndMealTypeAndIsDeletedFalse(Long userId, LocalDate entryDate, String mealType);
 
-    // Đếm số bữa ăn hợp lệ trong ngày (Không đếm số món)
     @Query("SELECT COUNT(DISTINCT e.entryId) FROM FoodEntry e " +
             "WHERE e.userId = :userId AND e.entryDate = :date AND e.isDeleted = false")
     Integer countValidMealsByUserAndDate(@Param("userId") Long userId, @Param("date") LocalDate date);
 
-    // Phục vụ cho Cron Job ban đêm: Tìm những người có ghi nhận ăn uống trong ngày hôm qua
     @Query("SELECT DISTINCT e.userId FROM FoodEntry e WHERE e.entryDate = :date")
     List<Long> findActiveUsersByDate(@Param("date") LocalDate date);
 }

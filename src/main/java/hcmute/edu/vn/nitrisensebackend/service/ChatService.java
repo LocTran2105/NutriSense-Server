@@ -67,28 +67,24 @@ public class ChatService {
     @Transactional
     public ChatMessageResponseDTO processUserMessage(Long userId, String userText) {
 
-        // 1. BUILD RAG CONTEXT
         StringBuilder contextBuilder = new StringBuilder("Ngữ cảnh hiện tại của User:\n");
         User user = userRepository.findById(userId).orElse(null);
 
-        // BƠM THÔNG TIN CƠ BẢN
         if (user != null && user.getWeightKg() != null && user.getHeightCm() != null) {
             contextBuilder.append(String.format("- Chỉ số cơ thể: Cân nặng %.1f kg, Chiều cao %.1f cm.\n",
                     user.getWeightKg(), user.getHeightCm()));
         }
 
-        // BƠM THÔNG TIN THIẾU HỤT
         String deficitContext = buildDailyNutrientDeficitContext(userId, user);
         contextBuilder.append(deficitContext);
 
-        // BƠM THÔNG TIN THỂ LỰC
+
         try {
             List<ExerciseTest> recentTests = exerciseTestRepository.findTop10ByUserIdOrderByTestDateDescTestIdDesc(userId);
             if (recentTests != null && !recentTests.isEmpty()) {
                 contextBuilder.append("- Đánh giá thể lực gần đây của user:\n");
                 for (ExerciseTest test : recentTests) {
                     String testName = test.getTestType();
-                    // Việt hóa tên bài tập
                     if ("pushups".equals(testName)) testName = "Hít đất";
                     else if ("plank_seconds".equals(testName)) testName = "Plank";
                     else if ("situps".equals(testName)) testName = "Gập bụng";
@@ -103,7 +99,6 @@ public class ChatService {
             System.err.println("[ChatService] Lỗi lấy dữ liệu thể lực: " + ignored.getMessage());
         }
 
-        // BƠM LỊCH SỬ CHAT
         try {
             List<ChatMessage> recentChats = chatRepository.findTop5ByUserIdOrderByCreatedAtDesc(userId);
             Collections.reverse(recentChats);
@@ -113,7 +108,6 @@ public class ChatService {
             }
         } catch (Exception ignored) {}
 
-        // 2. LƯU TIN NHẮN USER XUỐNG DB
         ChatMessage userMsg = new ChatMessage();
         userMsg.setUserId(userId);
         userMsg.setSender(ChatSender.USER);
@@ -122,7 +116,6 @@ public class ChatService {
         userMsg.setIsRead(true);
         chatRepository.save(userMsg);
 
-        // 3. PROMPT ENGINEERING
         String systemPrompt = contextBuilder.toString() + "\n\n" +
                 "Bạn là trợ lý dinh dưỡng và sức khỏe NitriSense.\n" +
                 "QUY TẮC:\n" +
@@ -139,7 +132,6 @@ public class ChatService {
                 "  \"context_data\": {}\n" +
                 "}";
 
-        // 4. GỌI AI VÀ XỬ LÝ FALLBACK (2 KEY GEMINI)
         ChatMessage aiMsg = new ChatMessage();
         aiMsg.setUserId(userId);
         aiMsg.setSender(ChatSender.AI);
@@ -147,12 +139,10 @@ public class ChatService {
 
         String aiJson = null;
         try {
-            // Thử bằng Key chính (useFallback = false)
             aiJson = geminiService.generateChatResponse(systemPrompt, userText, false);
         } catch (Exception e) {
             System.err.println("[ChatService] Gemini lỗi/quá tải (Key 1). Đang chuyển sang Key 2...");
             try {
-                // Thử bằng Key dự phòng (useFallback = true)
                 aiJson = geminiService.generateChatResponse(systemPrompt, userText, true);
                 System.out.println("[ChatService] Key Gemini 2 đã cứu cánh thành công!");
             } catch (Exception fallbackEx) {
@@ -162,7 +152,6 @@ public class ChatService {
 
         if (aiJson != null) {
             try {
-                // Chuẩn hóa chuỗi JSON cực kỳ an toàn
                 String cleanJson = aiJson.replaceAll("^```json\\s*", "").replaceAll("^```\\s*", "").replaceAll("```$", "").trim();
 
                 JsonNode root = mapper.readTree(cleanJson);
@@ -175,7 +164,7 @@ public class ChatService {
                 }
             } catch (Exception parseEx) {
                 System.err.println("[ChatService] Lỗi Parse JSON: " + parseEx.getMessage());
-                aiMsg.setMessageText(aiJson); // Lưu text thuần nếu bể định dạng
+                aiMsg.setMessageText(aiJson);
                 aiMsg.setMessageType(ChatMessageType.CHAT);
             }
         } else {
@@ -186,9 +175,6 @@ public class ChatService {
         return convertToDTO(chatRepository.save(aiMsg));
     }
 
-    // ========================================================
-    // HÀM BACKEND TỰ TÍNH TOÁN THIẾU HỤT
-    // ========================================================
     private String buildDailyNutrientDeficitContext(Long userId, User user) {
         StringBuilder sb = new StringBuilder();
 
@@ -196,7 +182,7 @@ public class ChatService {
         if (user != null) {
             if (user.getDailyCalorieGoal() != null) {
                 targetCal = user.getDailyCalorieGoal().doubleValue();
-                targetPro = (targetCal * 0.30) / 4.0; // 30% Calo từ Protein
+                targetPro = (targetCal * 0.30) / 4.0;
             }
             if (user.getWaterGoalMl() != null) {
                 targetWater = user.getWaterGoalMl().doubleValue();
