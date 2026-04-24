@@ -29,7 +29,7 @@
 ## ✨ Key Features
 
 ### 🤖 AI Nutrition Analysis
-- 📄 Nhập món ăn bằng text tự nhiên
+- 📄 Nhập món ăn bằng text tự nhiên hoặc voice
 - 📸 Nhận diện món ăn từ hình ảnh
 - 🔁 Fallback 2 API key (tăng độ ổn định)
 - ❓ AI tự hỏi lại nếu input mơ hồ
@@ -40,7 +40,7 @@
 - 🔥 Tính toán **TDEE + Calorie Goal**
 - 💧 Theo dõi lượng nước uống
 - 🥗 Phân tích **macro + vi chất**
-- 📈 Dashboard 7 ngày
+- 📈 Dashboard 7 ngày trong tuần
 
 ---
 
