@@ -70,12 +70,13 @@ public class AiService {
         properties.put("iron_mg", Map.of("type", "NUMBER"));
         properties.put("calcium_mg", Map.of("type", "NUMBER"));
         properties.put("potassium_mg", Map.of("type", "NUMBER"));
+        properties.put("confidence_score", Map.of("type", "NUMBER", "description", "Độ tin cậy của kết quả từ 0.0 đến 1.0"));
         properties.put("question", Map.of("type", "STRING", "description", "Câu hỏi ngược lại cho user"));
 
         List<String> requiredFields = Arrays.asList(
                 "status", "food_name", "calories", "protein_g", "carbs_g", "fat_g",
                 "fiber_g", "vitamin_a_mcg", "vitamin_b12_mcg", "vitamin_c_mg",
-                "vitamin_d_mcg", "iron_mg", "calcium_mg", "potassium_mg", "question"
+                "vitamin_d_mcg", "iron_mg", "calcium_mg", "potassium_mg", "confidence_score", "question"
         );
 
         Map<String, Object> schema = new HashMap<>();
@@ -94,6 +95,7 @@ public class AiService {
     // 1. NHẬN DIỆN TEXT (HỖ TRỢ NHIỀU MÓN) - PROMPT GỐC CỦA BẠN
     // ==========================================================
     public AiAnalyzeResult analyzeFood(Long userId, String userInput) {
+        long startTime = System.currentTimeMillis();
         String cleanJson = "[]";
         try {
             String instructionText =
@@ -122,7 +124,10 @@ public class AiService {
             cleanJson = parseSafe(response.getBody());
 
             List<NutrientDto> dtos = mapper.readValue(cleanJson, new TypeReference<List<NutrientDto>>() {});
-            saveLog(userId, "text", userInput, cleanJson, null);
+            
+            long processingTime = System.currentTimeMillis() - startTime;
+            BigDecimal confidence = (dtos != null && !dtos.isEmpty()) ? dtos.get(0).getConfidenceScore() : null;
+            saveLog(userId, "text", userInput, cleanJson, null, confidence, (int) processingTime);
 
             AiAnalyzeResult result = new AiAnalyzeResult();
             if (!dtos.isEmpty() && "ask_user".equals(dtos.get(0).getStatus())) {
@@ -140,12 +145,14 @@ public class AiService {
             }
             return result;
         } catch (HttpStatusCodeException e) {
+            long processingTime = System.currentTimeMillis() - startTime;
             logger.error("========== GOOGLE API ERROR (TEXT) ==========\n{}", e.getResponseBodyAsString());
-            saveLog(userId, "text", userInput, cleanJson, "Google Error: " + e.getResponseBodyAsString());
+            saveLog(userId, "text", userInput, cleanJson, "Google Error: " + e.getResponseBodyAsString(), null, (int) processingTime);
             throw new RuntimeException("Google API Error: " + e.getResponseBodyAsString());
         } catch (Exception e) {
+            long processingTime = System.currentTimeMillis() - startTime;
             logger.error("Lỗi AI Text: {}", e.getMessage());
-            saveLog(userId, "text", userInput, cleanJson, "Lỗi Parse: " + e.getMessage());
+            saveLog(userId, "text", userInput, cleanJson, "Lỗi Parse: " + e.getMessage(), null, (int) processingTime);
             throw new RuntimeException("Lỗi AI Text: " + e.getMessage());
         }
     }
@@ -154,6 +161,7 @@ public class AiService {
     // 2. NHẬN DIỆN ẢNH - PROMPT GỐC CỦA BẠN
     // ==========================================================
     public List<NutrientDto> analyzeFoodImage(Long userId, MultipartFile file) {
+        long startTime = System.currentTimeMillis();
         String cleanJson = "[]";
         String originalFilename = file != null ? file.getOriginalFilename() : "unknown_image";
 
@@ -181,15 +189,20 @@ public class AiService {
 
             cleanJson = parseSafe(response.getBody());
             List<NutrientDto> result = mapper.readValue(cleanJson, new TypeReference<List<NutrientDto>>() {});
-            saveLog(userId, "image", "Ảnh: " + originalFilename, cleanJson, null);
+            
+            long processingTime = System.currentTimeMillis() - startTime;
+            BigDecimal confidence = (result != null && !result.isEmpty()) ? result.get(0).getConfidenceScore() : null;
+            saveLog(userId, "image", "Ảnh: " + originalFilename, cleanJson, null, confidence, (int) processingTime);
             return result;
         } catch (HttpStatusCodeException e) {
+            long processingTime = System.currentTimeMillis() - startTime;
             logger.error("========== GOOGLE API ERROR (IMAGE) ==========\n{}", e.getResponseBodyAsString());
-            saveLog(userId, "image", "Ảnh: " + originalFilename, cleanJson, "Google Error");
+            saveLog(userId, "image", "Ảnh: " + originalFilename, cleanJson, "Google Error", null, (int) processingTime);
             throw new RuntimeException("Google API Error");
         } catch (Exception e) {
+            long processingTime = System.currentTimeMillis() - startTime;
             logger.error("Lỗi AI Ảnh: {}", e.getMessage());
-            saveLog(userId, "image", "Ảnh: " + originalFilename, cleanJson, e.getMessage());
+            saveLog(userId, "image", "Ảnh: " + originalFilename, cleanJson, e.getMessage(), null, (int) processingTime);
             throw new RuntimeException("Lỗi AI Ảnh: " + e.getMessage());
         }
     }
@@ -340,13 +353,15 @@ public class AiService {
         return text.replaceAll("^```json\\s*", "").replaceAll("```$", "").trim();
     }
 
-    private void saveLog(Long userId, String type, String input, String json, String error) {
+    private void saveLog(Long userId, String type, String input, String json, String error, BigDecimal confidence, Integer timeMs) {
         AiProcessingLog log = new AiProcessingLog();
         log.setUserId(userId);
         log.setInputType(type);
         log.setRawInput(input);
         log.setAiResponseJson((json == null || json.trim().isEmpty()) ? "[]" : json);
         log.setErrorMessage(error);
+        log.setConfidenceScore(confidence);
+        log.setProcessingTimeMs(timeMs);
         aiProcessingLogRepository.save(log);
     }
 

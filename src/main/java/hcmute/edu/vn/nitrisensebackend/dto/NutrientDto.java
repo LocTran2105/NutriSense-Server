@@ -172,6 +172,9 @@ public class NutrientDto {
     @JsonProperty("potassium_mg")
     private BigDecimal potassiumMg;
 
+    @JsonProperty("confidence_score")
+    private BigDecimal confidenceScore;
+
     public String getStatus() {
         return status;
     }
@@ -198,4 +201,7 @@ public class NutrientDto {
     private String rawInput; // THÊM BIẾN NÀY ĐỂ HỨNG DỮ LIỆU TỪ ANDROID
     public String getRawInput() { return rawInput; }
     public void setRawInput(String rawInput) { this.rawInput = rawInput; }
+
+    public BigDecimal getConfidenceScore() { return confidenceScore; }
+    public void setConfidenceScore(BigDecimal confidenceScore) { this.confidenceScore = confidenceScore; }
 }
