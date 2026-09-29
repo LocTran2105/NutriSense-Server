@@ -1,6 +1,5 @@
 package hcmute.edu.vn.nitrisensebackend.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,6 +53,11 @@ public class AiService {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("status", Map.of("type", "STRING", "description", "Chỉ được trả 'success' hoặc 'ask_user'"));
         properties.put("food_name", Map.of("type", "STRING", "description", "Tên món ăn. Nếu status là ask_user thì để rỗng"));
+
+        // Bổ sung ước lượng khối lượng cho cơ chế RAG
+        properties.put("estimated_weight_g", Map.of("type", "NUMBER", "description", "Khối lượng thực tế bạn đã ước lượng bằng gram (Ví dụ: 150)"));
+        properties.put("serving_unit", Map.of("type", "STRING", "description", "Luôn để là 'g'"));
+
         properties.put("calories", Map.of("type", "NUMBER"));
         properties.put("protein_g", Map.of("type", "NUMBER"));
         properties.put("carbs_g", Map.of("type", "NUMBER"));
@@ -69,7 +73,7 @@ public class AiService {
         properties.put("question", Map.of("type", "STRING", "description", "Câu hỏi ngược lại cho user"));
 
         List<String> requiredFields = Arrays.asList(
-                "status", "food_name", "calories", "protein_g", "carbs_g", "fat_g",
+                "status", "food_name", "estimated_weight_g", "serving_unit", "calories", "protein_g", "carbs_g", "fat_g",
                 "fiber_g", "vitamin_a_mcg", "vitamin_b12_mcg", "vitamin_c_mg",
                 "vitamin_d_mcg", "iron_mg", "calcium_mg", "potassium_mg", "question"
         );
@@ -89,15 +93,29 @@ public class AiService {
     public AiAnalyzeResult analyzeFood(Long userId, String userInput) {
         String cleanJson = "[]";
         try {
+            logger.info("========== BẮT ĐẦU PHÂN TÍCH MÓN ĂN ==========");
+            logger.info("[1. User Input]: {}", userInput);
+
+            // GỌI HÀM XỬ LÝ NLP THÔNG MINH ĐỂ QUÉT DB
+            String ragContext = buildRagContext(userInput);
+            logger.info("[2. DB Context Retrieved]: {}", ragContext);
+
+            // PROMPT NÂNG CẤP ÉP BUỘC LÀM TOÁN CHUẨN
             String instructionText =
-                    "Bạn là chuyên gia dinh dưỡng ẩm thực. Phân tích TẤT CẢ món ăn người dùng nhập vào. BẮT BUỘC trả về MẢNG JSON tuân thủ tuyệt đối schema.\n" +
-                            "QUY TẮC XỬ LÝ:\n" +
-                            "1. Phân tách từng món riêng biệt. LUÔN tự giả định khẩu phần trung bình. TUYỆT ĐỐI KHÔNG hỏi về số lượng.\n" +
-                            "2. BẮT BUỘC ask_user NẾU input không phải đồ ăn. KHÔNG ask_user nếu có thể suy luận món phổ biến.\n" +
-                            "3. Phải tính toán kỹ lưỡng vi chất. KHÔNG gán 0.0 nếu món đó thực tế có chứa chất đó.";
+                    "Bạn là một CỖ MÁY TÍNH TOÁN DINH DƯỠNG. Bạn phải phân tích món ăn người dùng nhập và trả về MẢNG JSON.\n\n" +
+                            "QUY TẮC CỐT LÕI (NẾU VI PHẠM SẼ BỊ PHẠT):\n" +
+                            "1. XÁC ĐỊNH KHỐI LƯỢNG (estimated_weight_g): Tự ước lượng 1 phần ăn người dùng mô tả nặng bao nhiêu gram. (Ví dụ '1 cái đùi gà' khoảng 150g).\n" +
+                            "2. TÍNH TOÁN TOÁN HỌC TỪ DỮ LIỆU CHUẨN: Nếu món ăn CÓ trong [DỮ LIỆU DINH DƯỠNG CHUẨN] bên dưới, BẠN BẮT BUỘC PHẢI DÙNG CHỈ SỐ CỦA NÓ. Bạn KHÔNG ĐƯỢC TỰ BỊA THÊM.\n" +
+                            "   - LƯU Ý QUAN TRỌNG: Hãy chọn DUY NHẤT một món có tên sát nghĩa nhất với món người dùng nhập. Cấm tuyệt đối lấy Calo của món này ghép với Protein của món khác.\n" +
+                            "   - Dữ liệu chuẩn là cho 100g.\n" +
+                            "   - CÔNG THỨC BẮT BUỘC: Hệ số = (estimated_weight_g / 100).\n" +
+                            "   - Kết quả cuối cùng = Hệ số * Giá_trị_trong_Dữ_liệu_chuẩn.\n" +
+                            "3. KIỂM TRA CHÉO: Calo TỔNG luôn phải xấp xỉ công thức: (Protein * 4) + (Carbs * 4) + (Fat * 9).\n" +
+                            "4. Nếu input không có ý nghĩa đồ ăn, trả về status 'ask_user'." + ragContext;
 
             Map<String, Object> requestBody = createGeminiRestRequest(instructionText, userInput, null, true);
 
+            logger.info("[3. Call AI]: Đang gửi request tới Gemini...");
             ResponseEntity<String> response;
             try {
                 response = sendRequestToGemini(requestBody, false);
@@ -111,6 +129,7 @@ public class AiService {
             }
 
             cleanJson = parseSafe(response.getBody());
+            logger.info("[4. AI Response JSON]: \n{}", cleanJson);
 
             List<NutrientDto> dtos = mapper.readValue(cleanJson, new TypeReference<List<NutrientDto>>() {});
             saveLog(userId, "text", userInput, cleanJson, null);
@@ -129,6 +148,7 @@ public class AiService {
                 }
                 result.setFoodItems(foodItems);
             }
+            logger.info("========== HOÀN TẤT PHÂN TÍCH ==========\n");
             return result;
         } catch (HttpStatusCodeException e) {
             logger.error("========== GOOGLE API ERROR (TEXT) ==========\n{}", e.getResponseBodyAsString());
@@ -146,13 +166,22 @@ public class AiService {
         String originalFilename = file != null ? file.getOriginalFilename() : "unknown_image";
 
         try {
+            logger.info("========== BẮT ĐẦU PHÂN TÍCH ẢNH ==========");
+            logger.info("[1. Nhận ảnh]: {}", originalFilename);
             String base64Image = Base64.getEncoder().encodeToString(file.getBytes()).replaceAll("\\s", "");
+
+            // PROMPT NHẬN DIỆN ẢNH CẬP NHẬT CHO KHỐI LƯỢNG
             String instructionImage =
                     "Bạn là chuyên gia dinh dưỡng ẩm thực. Nhận diện TẤT CẢ món ăn trong ảnh. BẮT BUỘC trả về mảng JSON tuân thủ tuyệt đối schema.\n" +
-                            "QUY TẮC: Phân tách từng món. Tự ước lượng khẩu phần. TUYỆT ĐỐI KHÔNG hỏi về số lượng. Tính vi chất đầy đủ.";
+                            "QUY TẮC:\n" +
+                            "1. Phân tách từng món.\n" +
+                            "2. Tự ước lượng khối lượng (estimated_weight_g) của từng món dựa vào tỉ lệ khung hình.\n" +
+                            "3. Dùng kiến thức để tính vi chất dựa trên khối lượng vừa ước lượng.\n" +
+                            "4. TUYỆT ĐỐI KHÔNG hỏi về số lượng (ask_user). Cứ tự tin ước lượng số gần đúng nhất.";
 
             Map<String, Object> requestBody = createGeminiRestRequest(instructionImage, null, base64Image, true);
 
+            logger.info("[2. Call AI Image]: Đang gửi request tới Gemini Vision...");
             ResponseEntity<String> response;
             try {
                 response = sendRequestToGemini(requestBody, false);
@@ -166,8 +195,11 @@ public class AiService {
             }
 
             cleanJson = parseSafe(response.getBody());
+            logger.info("[3. AI Image Response JSON]: \n{}", cleanJson);
+
             List<NutrientDto> result = mapper.readValue(cleanJson, new TypeReference<List<NutrientDto>>() {});
             saveLog(userId, "image", "Ảnh: " + originalFilename, cleanJson, null);
+            logger.info("========== HOÀN TẤT PHÂN TÍCH ẢNH ==========\n");
             return result;
         } catch (HttpStatusCodeException e) {
             logger.error("========== GOOGLE API ERROR (IMAGE) ==========\n{}", e.getResponseBodyAsString());
@@ -333,6 +365,11 @@ public class AiService {
     private FoodItem mapDtoToFoodItem(NutrientDto dto, Long userId) {
         FoodItem item = new FoodItem();
         item.setName(dto.getFoodName());
+
+        // SỬ DỤNG ESTIMATED_WEIGHT_G TRẢ VỀ TỪ GEMINI
+        item.setServingSize(dto.getEstimatedWeightG() != null ? BigDecimal.valueOf(dto.getEstimatedWeightG()) : BigDecimal.valueOf(100));
+        item.setServingUnit(dto.getServingUnit() != null ? dto.getServingUnit() : "g");
+
         item.setCalories(safeBigDecimal(dto.getCalories()));
         item.setProteinG(safeBigDecimal(dto.getProteinG()));
         item.setCarbsG(safeBigDecimal(dto.getCarbsG()));
@@ -347,12 +384,66 @@ public class AiService {
         item.setPotassiumMg(safeBigDecimal(dto.getPotassiumMg()));
         item.setSource("gemini_ai");
         item.setCreatedBy(userId);
-        item.setServingSize(BigDecimal.ONE);
-        item.setServingUnit("phần");
         return item;
     }
 
     private BigDecimal safeBigDecimal(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
+    }
+
+    // HÀM MỚI: Xử lý ngôn ngữ tiếng Việt và lấy dữ liệu RAG thông minh
+    private String buildRagContext(String userInput) {
+        // 1. Đồng bộ phương ngữ & chính tả (Map từ Nam ra Bắc vì DB dùng giọng Bắc)
+        String normalized = userInput.toLowerCase()
+                .replace("thịt heo", "thịt lợn")
+                .replace("chiên", "rán")
+                .replace("bánh mì", "bánh mỳ")
+                .replace("đậu hũ", "đậu phụ")
+                .replace("hột vịt", "trứng vịt")
+                .replace("đậu phộng", "lạc")
+                .replace("thơm", "dứa")
+                .replace("khóm", "dứa");
+
+        // 2. Tách các món ăn nếu người dùng nhập nhiều món cùng lúc (VD: "1 bát cơm và 1 đùi gà")
+        String[] dishes = normalized.split("\\s*(,|và|với|\\+|thêm)\\s*");
+
+        StringBuilder dbContext = new StringBuilder();
+        Set<Long> addedFoodIds = new HashSet<>(); // ĐÃ SỬA THÀNH LONG
+        boolean foundAny = false;
+
+        for (String dish : dishes) {
+            // 3. Lọc số lượng và các đơn vị vô thưởng vô phạt
+// 3. Lọc BỘ ĐƠN VỊ ĐẦY ĐỦ NHẤT của ẩm thực Việt Nam (Đã bổ sung rổ, mẹt, mâm, nồi)
+            String keyword = dish.replaceAll("(?i)\\b[0-9]+([.,][0-9]+)?\\b|\\b(cái|quả|trái|củ|bát|tô|ly|chén|con|gam|g|ml|đĩa|dĩa|phần|suất|lạng|kg|muỗng|thìa|ổ|cốc|chai|lon|hộp|miếng|lát|cuốn|chiếc|bắp|múi|nhánh|gói|rổ|mẹt|mâm|nồi)\\b", "")
+                    .replaceAll("\\s+", " ").trim();
+
+            if (keyword.isEmpty()) continue;
+
+            // 4. Rút gọn lấy tối đa 4 từ khóa cốt lõi để tìm kiếm (VD: "thịt lợn ba chỉ")
+            String[] words = keyword.split("\\s+");
+            String searchKey = keyword;
+            if (words.length > 4) {
+                searchKey = words[0] + " " + words[1] + " " + words[2] + " " + words[3];
+            }
+
+            // 5. Quét DB cho TỪNG món ăn riêng biệt
+            List<FoodItem> foods = foodItemRepository.findTop5ByNameContainingIgnoreCase(searchKey);
+            for (FoodItem item : foods) {
+                // Chỉ thêm vào chuỗi nếu món này chưa từng được lấy ra
+                if (addedFoodIds.add(item.getFoodId())) {
+                    if (!foundAny) {
+                        dbContext.append("\n\n[DỮ LIỆU DINH DƯỠNG CHUẨN (TÍNH TRÊN 100G)]:\n");
+                        foundAny = true;
+                    }
+                    dbContext.append(String.format("- Món: '%s' | Calo: %s kcal, Protein: %sg, Carbs: %sg, Fat: %sg\n",
+                            item.getName(), item.getCalories(), item.getProteinG(), item.getCarbsG(), item.getFatG()));
+                }
+            }
+        }
+
+        if (!foundAny) {
+            dbContext.append("\n\n[DỮ LIỆU DINH DƯỠNG CHUẨN]: Không có dữ liệu, hãy tự ước lượng bằng kiến thức y khoa.");
+        }
+        return dbContext.toString();
     }
 }

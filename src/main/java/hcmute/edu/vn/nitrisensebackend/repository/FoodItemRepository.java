@@ -10,6 +10,7 @@ import java.util.List;
 
 @Repository
 public interface FoodItemRepository extends JpaRepository<FoodItem, Long> {
+    List<FoodItem> findTop5ByNameContainingIgnoreCase(String keyword);
 
     @Query("SELECT f FROM FoodItem f WHERE f.isDeleted = false AND f.proteinG >= 15.0 ORDER BY f.proteinG DESC")
     List<FoodItem> findTopProteinFoods(Pageable pageable);
