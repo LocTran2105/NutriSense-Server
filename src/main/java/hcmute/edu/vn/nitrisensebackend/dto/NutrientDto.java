@@ -1,5 +1,6 @@
 package hcmute.edu.vn.nitrisensebackend.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
@@ -7,52 +8,52 @@ import java.math.BigDecimal;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class NutrientDto {
 
-    @JsonProperty("food_name")
+    @JsonProperty("food_name") @JsonAlias("foodName")
     private String foodName;
 
-    @JsonProperty("estimated_weight_g")
+    @JsonProperty("estimated_weight_g") @JsonAlias("estimatedWeightG")
     private Double estimatedWeightG;
 
-    @JsonProperty("serving_size")
+    @JsonProperty("serving_size") @JsonAlias("servingSize")
     private BigDecimal servingSize;
 
-    @JsonProperty("serving_unit")
+    @JsonProperty("serving_unit") @JsonAlias("servingUnit")
     private String servingUnit;
 
     @JsonProperty("calories")
     private BigDecimal calories;
 
-    @JsonProperty("protein_g")
+    @JsonProperty("protein_g") @JsonAlias("proteinG")
     private BigDecimal proteinG;
 
-    @JsonProperty("carbs_g")
+    @JsonProperty("carbs_g") @JsonAlias("carbsG")
     private BigDecimal carbsG;
 
-    @JsonProperty("fat_g")
+    @JsonProperty("fat_g") @JsonAlias("fatG")
     private BigDecimal fatG;
 
-    @JsonProperty("vitamin_c_mg")
+    @JsonProperty("vitamin_c_mg") @JsonAlias("vitaminCMg")
     private BigDecimal vitaminCMg;
 
-    @JsonProperty("calcium_mg")
+    @JsonProperty("calcium_mg") @JsonAlias("calciumMg")
     private BigDecimal calciumMg;
 
-    @JsonProperty("fiber_g")
+    @JsonProperty("fiber_g") @JsonAlias("fiberG")
     private BigDecimal fiberG;
 
-    @JsonProperty("vitamin_a_mcg")
+    @JsonProperty("vitamin_a_mcg") @JsonAlias("vitaminAMcg")
     private BigDecimal vitaminAMcg;
 
-    @JsonProperty("vitamin_b12_mcg")
+    @JsonProperty("vitamin_b12_mcg") @JsonAlias("vitaminB12Mcg")
     private BigDecimal vitaminB12Mcg;
 
-    @JsonProperty("vitamin_d_mcg")
+    @JsonProperty("vitamin_d_mcg") @JsonAlias("vitaminDMcg")
     private BigDecimal vitaminDMcg;
 
-    @JsonProperty("iron_mg")
+    @JsonProperty("iron_mg") @JsonAlias("ironMg")
     private BigDecimal ironMg;
 
-    @JsonProperty("potassium_mg")
+    @JsonProperty("potassium_mg") @JsonAlias("potassiumMg")
     private BigDecimal potassiumMg;
 
     @JsonProperty("status")
@@ -61,8 +62,12 @@ public class NutrientDto {
     @JsonProperty("question")
     private String question;
 
-    @JsonProperty("raw_input")
+    @JsonProperty("raw_input") @JsonAlias("rawInput")
     private String rawInput;
+
+    // "text" | "image" | "manual" | "barcode" - nguồn nhập liệu do client gửi lên
+    @JsonProperty("source")
+    private String source;
 
     // Getters and Setters
 
@@ -119,6 +124,9 @@ public class NutrientDto {
 
     public String getQuestion() { return question; }
     public void setQuestion(String question) { this.question = question; }
+
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
 
     public String getRawInput() { return rawInput; }
     public void setRawInput(String rawInput) { this.rawInput = rawInput; }

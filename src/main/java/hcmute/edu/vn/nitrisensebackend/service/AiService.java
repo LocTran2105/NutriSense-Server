@@ -391,9 +391,7 @@ public class AiService {
         return value != null ? value : BigDecimal.ZERO;
     }
 
-    // HÀM MỚI: Xử lý ngôn ngữ tiếng Việt và lấy dữ liệu RAG thông minh
     private String buildRagContext(String userInput) {
-        // 1. Đồng bộ phương ngữ & chính tả (Map từ Nam ra Bắc vì DB dùng giọng Bắc)
         String normalized = userInput.toLowerCase()
                 .replace("thịt heo", "thịt lợn")
                 .replace("chiên", "rán")
@@ -404,33 +402,35 @@ public class AiService {
                 .replace("thơm", "dứa")
                 .replace("khóm", "dứa");
 
-        // 2. Tách các món ăn nếu người dùng nhập nhiều món cùng lúc (VD: "1 bát cơm và 1 đùi gà")
         String[] dishes = normalized.split("\\s*(,|và|với|\\+|thêm)\\s*");
 
         StringBuilder dbContext = new StringBuilder();
-        Set<Long> addedFoodIds = new HashSet<>(); // ĐÃ SỬA THÀNH LONG
+        Set<Long> addedFoodIds = new HashSet<>();
         boolean foundAny = false;
 
         for (String dish : dishes) {
-            // 3. Lọc số lượng và các đơn vị vô thưởng vô phạt
-// 3. Lọc BỘ ĐƠN VỊ ĐẦY ĐỦ NHẤT của ẩm thực Việt Nam (Đã bổ sung rổ, mẹt, mâm, nồi)
-            // Đã thêm chữ 'U' vào (?iU) để hỗ trợ Unicode tiếng Việt
+            // Lọc bỏ số lượng và các đơn vị đo lường thông dụng
             String keyword = dish.replaceAll("(?iU)\\b[0-9]+([.,][0-9]+)?\\b|\\b(cái|quả|trái|củ|bát|tô|ly|chén|con|gam|g|ml|đĩa|dĩa|phần|suất|lạng|kg|muỗng|thìa|ổ|cốc|chai|lon|hộp|miếng|lát|cuốn|chiếc|bắp|múi|nhánh|gói|rổ|mẹt|mâm|nồi)\\b", "")
                     .replaceAll("\\s+", " ").trim();
 
             if (keyword.isEmpty()) continue;
 
-            // 4. Rút gọn lấy tối đa 4 từ khóa cốt lõi để tìm kiếm (VD: "thịt lợn ba chỉ")
+            // Tách các từ khóa nhỏ để tìm kiếm rộng hơn (Ví dụ: "táo tây" -> tìm "táo", "tây")
             String[] words = keyword.split("\\s+");
-            String searchKey = keyword;
-            if (words.length > 4) {
-                searchKey = words[0] + " " + words[1] + " " + words[2] + " " + words[3];
+
+            List<FoodItem> foods = new ArrayList<>();
+            for (String word : words) {
+                if (word.length() > 1) { // Chỉ tìm các từ có từ 2 ký tự trở lên
+                    List<FoodItem> matchWords = foodItemRepository.findTop5ByNameContainingIgnoreCaseAndSourceNot(word, "gemini_ai");
+                    foods.addAll(matchWords);
+                }
+            }
+            // Fallback tìm cả cụm từ gốc nếu danh sách rỗng
+            if (foods.isEmpty()) {
+                foods = foodItemRepository.findTop5ByNameContainingIgnoreCaseAndSourceNot(keyword, "gemini_ai");
             }
 
-            // 5. Quét DB cho TỪNG món ăn riêng biệt
-            List<FoodItem> foods = foodItemRepository.findTop5ByNameContainingIgnoreCaseAndSourceNot(searchKey, "gemini_ai");
             for (FoodItem item : foods) {
-                // Chỉ thêm vào chuỗi nếu món này chưa từng được lấy ra
                 if (addedFoodIds.add(item.getFoodId())) {
                     if (!foundAny) {
                         dbContext.append("\n\n[DỮ LIỆU DINH DƯỠNG CHUẨN (TÍNH TRÊN 100G)]:\n");

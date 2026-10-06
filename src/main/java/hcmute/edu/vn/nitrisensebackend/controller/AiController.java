@@ -1,5 +1,6 @@
 package hcmute.edu.vn.nitrisensebackend.controller;
 
+import hcmute.edu.vn.nitrisensebackend.dto.AiAnalyzeResult;
 import hcmute.edu.vn.nitrisensebackend.dto.NutrientDto;
 import hcmute.edu.vn.nitrisensebackend.service.AiService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,24 @@ public class AiController {
             Map<String, String> err = new HashMap<>();
             err.put("error", "Lỗi hệ thống nghiêm trọng: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(err);
+        }
+    }
+
+    @PostMapping("/analyze-text")
+    public ResponseEntity<?> analyzeText(
+            @RequestParam("userId") Long userId,
+            @RequestBody Map<String, String> payload) {
+        try {
+            String userInput = payload.get("userInput");
+            if (userInput == null || userInput.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Nội dung nhập không được để trống"));
+            }
+
+            AiAnalyzeResult result = aiService.analyzeFood(userId, userInput);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Lỗi phân tích: " + e.getMessage()));
         }
     }
 }

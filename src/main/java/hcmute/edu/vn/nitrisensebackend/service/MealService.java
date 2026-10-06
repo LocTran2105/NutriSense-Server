@@ -95,14 +95,26 @@ public class MealService {
         List<FoodEntryItem> itemsToSave = new ArrayList<>();
 
         for (NutrientDto dto : confirmedItems) {
+            String displayName = (dto.getFoodName() != null && !dto.getFoodName().trim().isEmpty())
+                    ? dto.getFoodName().trim() : "Món ăn";
+
+            // Khẩu phần: ưu tiên số gram (client gửi estimated_weight_g / serving_size)
+            BigDecimal servingSize = null;
+            if (dto.getEstimatedWeightG() != null && dto.getEstimatedWeightG() > 0) {
+                servingSize = BigDecimal.valueOf(dto.getEstimatedWeightG());
+            } else if (dto.getServingSize() != null && dto.getServingSize().signum() > 0) {
+                servingSize = dto.getServingSize();
+            }
+            boolean hasWeight = servingSize != null;
+
             FoodItem foodItem = new FoodItem();
-            foodItem.setName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
-            foodItem.setServingSize(dto.getServingSize() != null ? dto.getServingSize() : BigDecimal.ONE);
-            foodItem.setServingUnit(dto.getServingUnit() != null ? dto.getServingUnit() : "phần");
+            foodItem.setName(displayName);
+            foodItem.setServingSize(hasWeight ? servingSize : BigDecimal.ONE);
+            foodItem.setServingUnit(hasWeight ? "g"
+                    : (dto.getServingUnit() != null ? dto.getServingUnit() : "phần"));
 
-            // BỔ SUNG: SET CALORIES CHO FOOD_ITEM (Bắt buộc vì MySQL set NOT NULL)
+            // food_items.calories là NOT NULL
             foodItem.setCalories(safe(dto.getCalories()));
-
             foodItem.setProteinG(safe(dto.getProteinG()));
             foodItem.setCarbsG(safe(dto.getCarbsG()));
             foodItem.setFatG(safe(dto.getFatG()));
@@ -125,16 +137,14 @@ public class MealService {
             entryItem.setEntryId(currentEntry.getEntryId());
             entryItem.setFoodId(foodItem.getFoodId());
             entryItem.setServingQty(BigDecimal.ONE);
+            entryItem.setServingUnit(foodItem.getServingUnit());
 
-            if (dto.getRawInput() != null && !dto.getRawInput().trim().isEmpty()) {
-                entryItem.setRawInput(dto.getRawInput());
-                entryItem.setCustomName(dto.getRawInput());
-            } else {
-                entryItem.setRawInput(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
-                entryItem.setCustomName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
-            }
+            // custom_name = TÊN MÓN; raw_input = câu người dùng gõ (nếu có)
+            entryItem.setCustomName(displayName);
+            entryItem.setRawInput(dto.getRawInput() != null && !dto.getRawInput().trim().isEmpty()
+                    ? dto.getRawInput().trim() : displayName);
 
-            // CHỈ SET CALORIES PER SERVING, BỎ SET CALORIES ĐỂ MYSQL TỰ TÍNH
+            // CHỈ SET CALORIES PER SERVING, MYSQL TỰ TÍNH CỘT "CALORIES"
             entryItem.setCaloriesPerServing(foodItem.getCalories());
             entryItem.setCalories(entryItem.getCaloriesPerServing().multiply(entryItem.getServingQty()));
             entryItem.setProteinG(foodItem.getProteinG());
@@ -149,7 +159,9 @@ public class MealService {
             entryItem.setCalciumMg(foodItem.getCalciumMg());
             entryItem.setPotassiumMg(foodItem.getPotassiumMg());
 
-            entryItem.setSource("image");
+            // source phải thuộc ENUM('text','image','barcode','manual'); mặc định 'image' như cũ
+            String src = dto.getSource() != null ? dto.getSource().trim().toLowerCase() : "";
+            entryItem.setSource(java.util.Set.of("text", "image", "barcode", "manual").contains(src) ? src : "image");
             if (imageUrls != null) {
                 entryItem.setImageUrls(imageUrls);
             }
