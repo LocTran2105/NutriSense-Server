@@ -40,6 +40,35 @@ public class ScheduleController {
         return ResponseEntity.ok(savedSchedule);
     }
 
+    // API Cập nhật (Sửa) lịch trình
+    @PutMapping("/{id}")
+    public ResponseEntity<Schedule> updateSchedule(
+            @PathVariable("id") Long id,
+            @RequestBody Schedule updatedSchedule) {
+
+        return scheduleRepository.findById(id).map(existingSchedule -> {
+            existingSchedule.setTitle(updatedSchedule.getTitle());
+            existingSchedule.setNotes(updatedSchedule.getNotes());
+            existingSchedule.setStartTime(updatedSchedule.getStartTime());
+            // is_user_modified được set = true khi người dùng chỉnh sửa
+            existingSchedule.setUserModified(true);
+
+            Schedule savedSchedule = scheduleRepository.save(existingSchedule);
+            return ResponseEntity.ok(savedSchedule);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    // API Xóa lịch trình
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteSchedule(@PathVariable("id") Long id) {
+        return scheduleRepository.findById(id).map(schedule -> {
+            // Xóa mềm hoặc xóa cứng. Dựa theo cấu trúc database có cờ is_deleted, ta dùng xóa mềm:
+            schedule.setDeleted(true);
+            scheduleRepository.save(schedule);
+            return ResponseEntity.ok().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<Schedule> toggleScheduleCompletion(
             @PathVariable("id") Long id,

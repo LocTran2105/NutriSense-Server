@@ -23,4 +23,7 @@ public interface FoodItemRepository extends JpaRepository<FoodItem, Long> {
 
     @Query("SELECT f FROM FoodItem f WHERE f.isDeleted = false AND f.calciumMg >= 100.0 ORDER BY f.calciumMg DESC")
     List<FoodItem> findTopCalciumFoods(Pageable pageable);
+
+    // Tìm món ăn chuẩn (không phải do AI tạo ra hoặc đã được verify)
+    List<FoodItem> findTop5ByNameContainingIgnoreCaseAndSourceNot(String name, String source);
 }

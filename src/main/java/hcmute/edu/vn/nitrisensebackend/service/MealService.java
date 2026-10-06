@@ -23,7 +23,6 @@ public class MealService {
     @Autowired private FoodItemRepository foodItemRepository;
     @Autowired private FoodEntryRepository foodEntryRepository;
     @Autowired private FoodEntryItemRepository foodEntryItemRepository;
-
     @Autowired private DailySummaryService dailySummaryService;
 
     @Transactional
@@ -41,9 +40,7 @@ public class MealService {
             newEntry.setEntryDate(today);
             newEntry.setMealType(mealType);
             newEntry.setCreatedBy(userId);
-
             newEntry.setDeleted(false);
-
             return foodEntryRepository.save(newEntry);
         });
 
@@ -53,7 +50,9 @@ public class MealService {
         entryItem.setServingQty(BigDecimal.ONE);
         entryItem.setServingUnit(foodItem.getServingUnit() != null ? foodItem.getServingUnit() : "phần");
 
+        // CHỈ SET CALORIES PER SERVING, MYSQL SẼ TỰ ĐỘNG TÍNH TOÁN CỘT "CALORIES"
         entryItem.setCaloriesPerServing(foodItem.getCalories());
+        entryItem.setCalories(entryItem.getCaloriesPerServing().multiply(entryItem.getServingQty()));
         entryItem.setProteinG(foodItem.getProteinG());
         entryItem.setCarbsG(foodItem.getCarbsG());
         entryItem.setFatG(foodItem.getFatG());
@@ -75,94 +74,93 @@ public class MealService {
         entryItem.setDeleted(false);
 
         FoodEntryItem savedItem = foodEntryItemRepository.save(entryItem);
-
         dailySummaryService.recalculateDailySummary(userId, today);
         return savedItem;
     }
 
+    @Transactional(rollbackOn = Exception.class)
+    public void saveMealFromAi(Long userId, String mealType, LocalDate date, List<NutrientDto> confirmedItems, String imageUrls) {
 
-        @Transactional(rollbackOn = Exception.class)
-        public void saveMealFromAi(Long userId, String mealType, LocalDate date, List<NutrientDto> confirmedItems, String imageUrls) {
+        FoodEntry currentEntry = foodEntryRepository.findByUserIdAndEntryDateAndMealTypeAndIsDeletedFalse(userId, date, mealType)
+                .orElseGet(() -> {
+                    FoodEntry newEntry = new FoodEntry();
+                    newEntry.setUserId(userId);
+                    newEntry.setEntryDate(date);
+                    newEntry.setMealType(mealType);
+                    newEntry.setCreatedBy(userId);
+                    newEntry.setDeleted(false);
+                    return foodEntryRepository.save(newEntry);
+                });
 
-            FoodEntry currentEntry = foodEntryRepository.findByUserIdAndEntryDateAndMealTypeAndIsDeletedFalse(userId, date, mealType)
-                    .orElseGet(() -> {
-                        FoodEntry newEntry = new FoodEntry();
-                        newEntry.setUserId(userId);
-                        newEntry.setEntryDate(date);
-                        newEntry.setMealType(mealType);
-                        newEntry.setCreatedBy(userId);
+        List<FoodEntryItem> itemsToSave = new ArrayList<>();
 
-                        newEntry.setDeleted(false);
+        for (NutrientDto dto : confirmedItems) {
+            FoodItem foodItem = new FoodItem();
+            foodItem.setName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
+            foodItem.setServingSize(dto.getServingSize() != null ? dto.getServingSize() : BigDecimal.ONE);
+            foodItem.setServingUnit(dto.getServingUnit() != null ? dto.getServingUnit() : "phần");
 
-                        return foodEntryRepository.save(newEntry);
-                    });
+            // BỔ SUNG: SET CALORIES CHO FOOD_ITEM (Bắt buộc vì MySQL set NOT NULL)
+            foodItem.setCalories(safe(dto.getCalories()));
 
-            List<FoodEntryItem> itemsToSave = new ArrayList<>();
+            foodItem.setProteinG(safe(dto.getProteinG()));
+            foodItem.setCarbsG(safe(dto.getCarbsG()));
+            foodItem.setFatG(safe(dto.getFatG()));
+            foodItem.setFiberG(safe(dto.getFiberG()));
+            foodItem.setVitaminAMcg(safe(dto.getVitaminAMcg()));
+            foodItem.setVitaminB12Mcg(safe(dto.getVitaminB12Mcg()));
+            foodItem.setVitaminCMg(safe(dto.getVitaminCMg()));
+            foodItem.setVitaminDMcg(safe(dto.getVitaminDMcg()));
+            foodItem.setIronMg(safe(dto.getIronMg()));
+            foodItem.setCalciumMg(safe(dto.getCalciumMg()));
+            foodItem.setPotassiumMg(safe(dto.getPotassiumMg()));
 
-            for (NutrientDto dto : confirmedItems) {
-                FoodItem foodItem = new FoodItem();
-                foodItem.setName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
-                foodItem.setServingSize(dto.getServingSize() != null ? dto.getServingSize() : BigDecimal.ONE);
-                foodItem.setServingUnit(dto.getServingUnit() != null ? dto.getServingUnit() : "phần");
+            foodItem.setSource("gemini_ai");
+            foodItem.setCreatedBy(userId);
+            foodItem.setDeleted(false);
 
-                foodItem.setCalories(safe(dto.getCalories()));
-                foodItem.setProteinG(safe(dto.getProteinG()));
-                foodItem.setCarbsG(safe(dto.getCarbsG()));
-                foodItem.setFatG(safe(dto.getFatG()));
-                foodItem.setFiberG(safe(dto.getFiberG()));
-                foodItem.setVitaminAMcg(safe(dto.getVitaminAMcg()));
-                foodItem.setVitaminB12Mcg(safe(dto.getVitaminB12Mcg()));
-                foodItem.setVitaminCMg(safe(dto.getVitaminCMg()));
-                foodItem.setVitaminDMcg(safe(dto.getVitaminDMcg()));
-                foodItem.setIronMg(safe(dto.getIronMg()));
-                foodItem.setCalciumMg(safe(dto.getCalciumMg()));
-                foodItem.setPotassiumMg(safe(dto.getPotassiumMg()));
+            foodItem = foodItemRepository.save(foodItem);
 
-                foodItem.setSource("gemini_ai");
-                foodItem.setCreatedBy(userId);
+            FoodEntryItem entryItem = new FoodEntryItem();
+            entryItem.setEntryId(currentEntry.getEntryId());
+            entryItem.setFoodId(foodItem.getFoodId());
+            entryItem.setServingQty(BigDecimal.ONE);
 
-                foodItem.setDeleted(false);
-
-                foodItem = foodItemRepository.save(foodItem);
-
-                FoodEntryItem entryItem = new FoodEntryItem();
-                entryItem.setEntryId(currentEntry.getEntryId());
-                entryItem.setFoodId(foodItem.getFoodId());
-                entryItem.setServingQty(BigDecimal.ONE);
-                if (dto.getRawInput() != null && !dto.getRawInput().trim().isEmpty()) {
-                    entryItem.setRawInput(dto.getRawInput());
-                    entryItem.setCustomName(dto.getRawInput());
-                } else {
-
-                    entryItem.setRawInput(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
-                    entryItem.setCustomName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
-                }
-                entryItem.setCaloriesPerServing(foodItem.getCalories());
-                entryItem.setProteinG(foodItem.getProteinG());
-                entryItem.setCarbsG(foodItem.getCarbsG());
-                entryItem.setFatG(foodItem.getFatG());
-                entryItem.setFiberG(foodItem.getFiberG());
-                entryItem.setVitaminAMcg(foodItem.getVitaminAMcg());
-                entryItem.setVitaminB12Mcg(foodItem.getVitaminB12Mcg());
-                entryItem.setVitaminCMg(foodItem.getVitaminCMg());
-                entryItem.setVitaminDMcg(foodItem.getVitaminDMcg());
-                entryItem.setIronMg(foodItem.getIronMg());
-                entryItem.setCalciumMg(foodItem.getCalciumMg());
-                entryItem.setPotassiumMg(foodItem.getPotassiumMg());
-
-                entryItem.setSource("image");
-                if (imageUrls != null) {
-                    entryItem.setImageUrls(imageUrls);
-                }
-
-                entryItem.setDeleted(false);
-
-                itemsToSave.add(entryItem);
+            if (dto.getRawInput() != null && !dto.getRawInput().trim().isEmpty()) {
+                entryItem.setRawInput(dto.getRawInput());
+                entryItem.setCustomName(dto.getRawInput());
+            } else {
+                entryItem.setRawInput(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
+                entryItem.setCustomName(dto.getFoodName() != null ? dto.getFoodName() : "Món ăn từ ảnh");
             }
 
-            foodEntryItemRepository.saveAll(itemsToSave);
-            dailySummaryService.recalculateDailySummary(userId, date);
+            // CHỈ SET CALORIES PER SERVING, BỎ SET CALORIES ĐỂ MYSQL TỰ TÍNH
+            entryItem.setCaloriesPerServing(foodItem.getCalories());
+            entryItem.setCalories(entryItem.getCaloriesPerServing().multiply(entryItem.getServingQty()));
+            entryItem.setProteinG(foodItem.getProteinG());
+            entryItem.setCarbsG(foodItem.getCarbsG());
+            entryItem.setFatG(foodItem.getFatG());
+            entryItem.setFiberG(foodItem.getFiberG());
+            entryItem.setVitaminAMcg(foodItem.getVitaminAMcg());
+            entryItem.setVitaminB12Mcg(foodItem.getVitaminB12Mcg());
+            entryItem.setVitaminCMg(foodItem.getVitaminCMg());
+            entryItem.setVitaminDMcg(foodItem.getVitaminDMcg());
+            entryItem.setIronMg(foodItem.getIronMg());
+            entryItem.setCalciumMg(foodItem.getCalciumMg());
+            entryItem.setPotassiumMg(foodItem.getPotassiumMg());
+
+            entryItem.setSource("image");
+            if (imageUrls != null) {
+                entryItem.setImageUrls(imageUrls);
+            }
+
+            entryItem.setDeleted(false);
+            itemsToSave.add(entryItem);
         }
+
+        foodEntryItemRepository.saveAll(itemsToSave);
+        dailySummaryService.recalculateDailySummary(userId, date);
+    }
 
     public List<FoodEntryItem> getMealItems(Long userId, LocalDate date, String mealType) {
         Optional<FoodEntry> entry = foodEntryRepository
@@ -190,7 +188,6 @@ public class MealService {
                 foodEntryItemRepository.save(item);
             }
 
-
             dailySummaryService.recalculateDailySummary(userId, date);
         }
     }
@@ -202,7 +199,6 @@ public class MealService {
             FoodEntryItem item = itemOpt.get();
             item.setDeleted(true);
             foodEntryItemRepository.save(item);
-
 
             foodEntryRepository.findById(item.getEntryId()).ifPresent(entry -> {
                 dailySummaryService.recalculateDailySummary(entry.getUserId(), entry.getEntryDate());

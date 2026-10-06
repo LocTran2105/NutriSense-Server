@@ -414,7 +414,8 @@ public class AiService {
         for (String dish : dishes) {
             // 3. Lọc số lượng và các đơn vị vô thưởng vô phạt
 // 3. Lọc BỘ ĐƠN VỊ ĐẦY ĐỦ NHẤT của ẩm thực Việt Nam (Đã bổ sung rổ, mẹt, mâm, nồi)
-            String keyword = dish.replaceAll("(?i)\\b[0-9]+([.,][0-9]+)?\\b|\\b(cái|quả|trái|củ|bát|tô|ly|chén|con|gam|g|ml|đĩa|dĩa|phần|suất|lạng|kg|muỗng|thìa|ổ|cốc|chai|lon|hộp|miếng|lát|cuốn|chiếc|bắp|múi|nhánh|gói|rổ|mẹt|mâm|nồi)\\b", "")
+            // Đã thêm chữ 'U' vào (?iU) để hỗ trợ Unicode tiếng Việt
+            String keyword = dish.replaceAll("(?iU)\\b[0-9]+([.,][0-9]+)?\\b|\\b(cái|quả|trái|củ|bát|tô|ly|chén|con|gam|g|ml|đĩa|dĩa|phần|suất|lạng|kg|muỗng|thìa|ổ|cốc|chai|lon|hộp|miếng|lát|cuốn|chiếc|bắp|múi|nhánh|gói|rổ|mẹt|mâm|nồi)\\b", "")
                     .replaceAll("\\s+", " ").trim();
 
             if (keyword.isEmpty()) continue;
@@ -427,7 +428,7 @@ public class AiService {
             }
 
             // 5. Quét DB cho TỪNG món ăn riêng biệt
-            List<FoodItem> foods = foodItemRepository.findTop5ByNameContainingIgnoreCase(searchKey);
+            List<FoodItem> foods = foodItemRepository.findTop5ByNameContainingIgnoreCaseAndSourceNot(searchKey, "gemini_ai");
             for (FoodItem item : foods) {
                 // Chỉ thêm vào chuỗi nếu món này chưa từng được lấy ra
                 if (addedFoodIds.add(item.getFoodId())) {

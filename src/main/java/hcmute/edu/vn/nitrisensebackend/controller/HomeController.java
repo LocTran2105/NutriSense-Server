@@ -50,6 +50,7 @@ public class HomeController {
             result.put("totalCarbsG", s.getTotalCarbsG() != null ? s.getTotalCarbsG().doubleValue() : 0.0);
             result.put("totalFatG", s.getTotalFatG() != null ? s.getTotalFatG().doubleValue() : 0.0);
             result.put("totalWaterMl", s.getTotalWaterMl() != null ? s.getTotalWaterMl() : 0);
+            result.put("numMeals", s.getNumMeals() != null ? s.getNumMeals() : 0);
             result.put("date", targetDate.toString());
         } else {
             result.put("totalCalories", 0);
@@ -57,6 +58,7 @@ public class HomeController {
             result.put("totalCarbsG", 0.0);
             result.put("totalFatG", 0.0);
             result.put("totalWaterMl", 0);
+            result.put("numMeals", 0);
             result.put("date", targetDate.toString());
         }
         return ResponseEntity.ok(result);

@@ -1,5 +1,6 @@
 package hcmute.edu.vn.nitrisensebackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,6 +27,7 @@ public class User {
     @Column(name = "avatar_url", columnDefinition = "TEXT")
     private String avatarUrl;
 
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
@@ -55,6 +57,9 @@ public class User {
 
     @Column(name = "updated_at", insertable = false, updatable = false)
     private LocalDateTime updatedAt;
+
+    @Column(name = "goal")
+    private String goal;
 
     public Long getUserId() {
         return userId;
@@ -146,4 +151,6 @@ public class User {
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+    public String getGoal() { return goal; }
+    public void setGoal(String goal) { this.goal = goal; }
 }

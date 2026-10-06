@@ -3,6 +3,7 @@ package hcmute.edu.vn.nitrisensebackend.controller;
 import hcmute.edu.vn.nitrisensebackend.dto.UserProfileRequest;
 import hcmute.edu.vn.nitrisensebackend.entity.User;
 import hcmute.edu.vn.nitrisensebackend.repository.UserRepository;
+import hcmute.edu.vn.nitrisensebackend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,8 @@ public class UserController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private UserService userService;
     @GetMapping("/{userId}")
     public ResponseEntity<?> getUserProfile(@PathVariable Long userId) {
         Optional<User> userOpt = userRepository.findById(userId);
@@ -29,28 +32,13 @@ public class UserController {
 
     @PutMapping("/{userId}/profile")
     public ResponseEntity<User> updateUserProfile(@PathVariable Long userId, @RequestBody User request) {
-        Optional<User> optionalUser = userRepository.findById(userId);
+        // Giao toàn bộ việc cập nhật và tính toán cho Service
+        User updatedUser = userService.updateUserProfile(userId, request);
 
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
-
-            if (request.getDisplayName() != null) {
-                user.setDisplayName(request.getDisplayName());
-            }
-            if (request.getDateOfBirth() != null) {
-                user.setDateOfBirth(request.getDateOfBirth());
-            }
-
-            if (request.getHeightCm() != null) user.setHeightCm(request.getHeightCm());
-            if (request.getWeightKg() != null) user.setWeightKg(request.getWeightKg());
-            if (request.getGender() != null) user.setGender(request.getGender());
-            if (request.getActivityLevel() != null) user.setActivityLevel(request.getActivityLevel());
-            if (request.getDailyCalorieGoal() != null) user.setDailyCalorieGoal(request.getDailyCalorieGoal());
-            if (request.getWaterGoalMl() != null) user.setWaterGoalMl(request.getWaterGoalMl());
-
-            User savedUser = userRepository.save(user);
-            return ResponseEntity.ok(savedUser);
+        if (updatedUser != null) {
+            return ResponseEntity.ok(updatedUser);
         }
+
         return ResponseEntity.notFound().build();
     }
 
